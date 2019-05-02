@@ -27,7 +27,7 @@ def generate_class_histogram_data(core_path, elective_path, repeat):
         #print(results)
         for result in results:
             #print(result)
-            utils.sum_to_dict(result[0].decode("utf-8"), 1, histo_gram_dict)
+            utils.sum_to_dict(result[0], 1, histo_gram_dict)
     cursor.close()
     cnx.close()
 
@@ -46,7 +46,7 @@ def generate_class_histogram_data(core_path, elective_path, repeat):
             name="sum"
         )
     ]
-    py.plot(hist_data, filename='binned classes')
+    py.plot(hist_data, filename='feb4tests_binned classes')
 
     return course_list, course_freq
 
@@ -141,7 +141,7 @@ def calc_gpa_histogram(testers):
     prefix = "student"
     if testers:
         prefix = "tester"
-    py.plot(hist_data, filename=prefix+' histogram')
+    py.plot(hist_data, filename="feb4tests_"+prefix+' histogram')
 
     cnx.close()
     cursor.close()
@@ -242,7 +242,7 @@ def check_bonus_effect(core_path, elective_path, testers):
         )
     )
     data = [trace0, trace1]
-    py.plot(data)
+    py.plot(data, filename="feb4tests_grade_penalty")
 
 def semester_dissolve(hist):
     semester_dict = {}
@@ -309,21 +309,21 @@ def check_class_load_effect(core_path, elective_path, testers):
 
 
     trace0 = go.Box(
-        y=grade_sets_penalty,
-        name=prefix + ' penalty course grades',
+        y=grade_sets_no_penalty,
+        name=prefix + ' normal course grades ',
         marker=dict(
             color='rgb(214, 12, 140)',
         )
     )
     trace1 = go.Box(
-        y=grade_sets_no_penalty,
-        name=prefix +' normal course grades',
+        y=grade_sets_penalty,
+        name=prefix +' penalty course grades',
         marker=dict(
             color='rgb(0, 128, 128)',
         )
     )
     data = [trace0, trace1]
-    py.plot(data)
+    py.plot(data, filename="feb4test_coure_load_penalty")
 
 
 
@@ -333,20 +333,20 @@ def check_class_load_effect(core_path, elective_path, testers):
 #gpa_result = calc_gpa_histogram(True)
 
 #generate_class_histogram_data( "/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
-   #                        "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", False)
+#                           "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", False)
 
 #generate_class_histogram_data( "/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
-  #                         "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", True)
+#                           "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", True)
 
-#check_class_load_effect("/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
- #                          "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", False)
+check_class_load_effect("/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
+                           "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", False)
 
-#check_bonus_effect("/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
-#                           "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", False)
+check_bonus_effect("/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
+                           "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", False)
 
 
 #check_class_load_effect("/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
 #                          "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", True)
 
 #check_bonus_effect("/Users/thomasolson/Documents/workspace/advising_revamp/core.csv",
- #                         "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", True)
+#                          "/Users/thomasolson/Documents/workspace/advising_revamp/electives.csv", True)

@@ -166,7 +166,7 @@ def persist_students(student_data, cnx):
 
         for course in student.course_history:
             sql = "insert into class_list_tester (STUDENT_ID, CLASS_NAME, SEMESTER_TAKEN, GRADE, TYPE) values (%s, %s, %s, %s, %s)"
-            values = (student.id_num, course.name, course.semester, course.grade, course.type)
+            values = (student.id_num, course.name, course.semester, course.grade, course.class_type)
             cursor.execute(sql, values)
     cnx.commit()
     cursor.close()
@@ -212,12 +212,12 @@ def test_3():
         print(random.normalvariate(.95, .05))
 
 def populate_tester_db():
-    starting_id = "12345678"
+    starting_id = "1"
     insert_db = [];
     cnx = utils.get_connetion("advisor", "passadvise", "localhost", "ADVISING")
     cursor = cnx.cursor(buffered=True)
 
-    for x in range(1,11):
+    for x in range(1,145):
         sql = "select STUDENT_FIRST_NAME, STUDENT_LAST_NAME, STUDENT_EMAIL from student_list_tester where STUDENT_ID = %s"
 
         key = (str(x),)
@@ -226,13 +226,12 @@ def populate_tester_db():
         first_name = results[0]
         last_name =results[1]
         email = results[2]
-        entry = [first_name, last_name, email]
+        entry = [first_name, last_name, email, x]
         insert_db.append(entry)
 
-    for x in range(0,10):
-        db_entry = insert_db[x]
+    for db_entry in insert_db:
         sql = "insert into checkpoints (STUDENT_ID, STUDENT_FIRST_NAME, STUDENT_LAST_NAME, STUDENT_EMAIL) values (%s, %s, %s, %s)"
-        key = (starting_id + str(x), db_entry[0], db_entry[1], db_entry[2])
+        key = (db_entry[3], db_entry[0], db_entry[1], db_entry[2])
         cursor.execute(sql, key)
     cnx.commit()
     cursor.close()

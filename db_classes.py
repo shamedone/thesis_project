@@ -1,3 +1,6 @@
+from random import randint
+import utils
+
 class Student:
     def __init__(self, first_name, last_name, email, grade_adj, id_num):
         self.first_name = first_name
@@ -7,15 +10,21 @@ class Student:
         self.electives_taken = 0
         self.core_classes = []
         self.age = 0 # age in semesters
-        self.passed_classes = []
-        self.course_history = []
+        self.passed_classes = [] # do we need both of these?
+        self.course_history = [] # do we need we c
         self.grade_adj = grade_adj
         self.id_num = id_num
         self.status = "in progress"
-
+        self.course_seq_dict = {}
+        self.sem_avg_grades = {}
+        self.sem_seq_dict = {}
+        self.unique_courses = {}
+        self.major = ""
+        self.fp_dict = {}
 
     def add_course(self, course):
         self.class_list.append(course)
+        utils.add_to_dict_list(course.name, course, self.unique_courses)
         if course.grade >= 60:
             self.passed_classes.append(course.name)
         self.course_history.append(course)
@@ -65,6 +74,7 @@ class Student:
 
     def adjust_grade(self, course, course_count):
         grade_adjust = float(course[1])
+        grade_adjust += (randint(-20,20) / 1000) #vary course grade results slightly
         if (course[3] == 1 and course_count >= 5) or course_count > 5:
             grade_adjust -= .1
 
@@ -75,11 +85,11 @@ class Student:
 
 
 class Course:
-    def __init__(self, name, grade, semester, type, prereqs=None):
+    def __init__(self, name, grade, semester, class_type, prereqs=None):
         self.name = name
         self.grade = grade
         self.semester = semester
-        self.type = type
+        self.class_type = class_type
 
         if prereqs is None:
             self.prereqs = []
