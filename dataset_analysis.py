@@ -1,67 +1,5 @@
 import utils
-from db_classes import Course
-from db_classes import Student
-
-
-def add_to_student_obj(student_id, course, dict_): #pulls in data from test data, student id refers to place                                                    # in line data that contains student id.
-    if student_id in dict_:
-        temp = dict_[student_id]
-        temp.add_course(course)
-        dict_[student_id] = temp
-    else:
-        student = Student("na", "na", "na", "na", student_id)
-        student.add_course(course)
-        dict_[student_id] = student
-
-def build_student_dict(student_data, id_int, class_int, grade_int, year_int): #returns dict of student objs, complete with course work.
-    student_dict = {}
-    for data in student_data:
-        student_id = data[id_int]
-        course = Course(data[class_int], float(data[grade_int]), data[year_int],"None")
-        add_to_student_obj(student_id, course, student_dict)
-    return student_dict
-
-def build_class_key_vector(datas, class_int): #runs through list of classes, and gives each a unique identifier.
-    key_dict = {}
-    i = 0
-    class_list = set()
-    for data in datas:
-        class_list.add(data[class_int])
-    for classes in class_list:
-        key_dict[classes] = i
-        i+=1
-    return key_dict
-
-def build_student_class_seq(students): #adds a map to class sequence, which is a dicitionary object with each key a the order of the semesters
-                                        # linking to a list of classes taken that semester.
-    for student in students:
-        seqs = []
-        for course in student.course_history:
-            if course.semester not in seqs:
-                seqs.append(course.semester)
-        seqs.sort()
-        for course in student.course_history:
-            seq = course.semester
-            seq_index = seqs.index(seq) + 1
-            if seq_index not in student.course_seq_dict:
-                student.sem_seq_dict[seq_index] = seq
-                student.course_seq_dict[seq_index] = [course]
-            else:
-                temp = student.course_seq_dict[seq_index]
-                temp.append(course)
-                student.course_seq_dict[seq_index] = temp
-
-    for student in students:
-        for key in student.course_seq_dict:
-            grades = []
-            sem_list = student.course_seq_dict[key]
-            for cor in sem_list:
-                grades.append(cor.grade)
-            avg_grade = float(sum(grades))/len(grades)
-            student.sem_avg_grades[key] = avg_grade
-
-
-
+import import_tools
 
 def year_count(students):
     for student in students:
@@ -86,7 +24,7 @@ def year_count(students):
             student_set.add(course.semester)
         print(str(student.id_num)+","+str(len(student_set)))
 
-def label_drop_outs(students): #student drop out conditions
+def label_drop_outs_span(students): #student drop out conditions
     do_count = 0
     one_years = 0
     for student in students:
@@ -113,6 +51,34 @@ def label_drop_outs(students): #student drop out conditions
     print(str(one_years)+" one years")
     print(str(do_count)+" droppouts")
 
+def label_drop_outs_sfsu(students): #student drop out conditions
+    do_count = 0
+    one_years = 0
+    core_classes = import_tools.import_core_sfsu_classes()
+    for student in students:
+        if len(student.course_seq_dict) == 1 and student.sem_seq_dict[1] == "20184": #only enrolled in one semester
+            one_years+=1
+            continue
+
+        ##this may be unnecssary
+        if len(student.course_seq_dict) == 1 and student.sem_seq_dict[1] != "20184": #enroll in one year and dont return, tho logically we dont need to check for second and
+            do_count += 1
+            student.status = "drop_out_one_done"
+            #print(student.status)
+            #print(student.id_num)
+            continue
+        #check for drop out, if last semester is not 20184 and cs core classes not taken, label dropout
+        #  this could be the only drop out analysis section here.
+        if max(student.sem_seq_dict.keys()) != 20184:
+            for core_class in core_classes:
+                if core_class.name not in student.unique_courses:
+                    student.status = "drop_out"
+                    do_count+=1
+
+    print(str(len(students)-one_years)+" total students")
+    print(str(one_years)+" one years")
+    print(str(do_count)+" droppouts")
+
 def analyze_drop_outs(students, **kwargs):
     drop_outs = []
     for student in students:
@@ -127,7 +93,7 @@ def analyze_drop_outs(students, **kwargs):
 def print_class_dict(path, **kwargs): #G1042 - math
                             #G1077 - cs
     student_data = utils.list_from_file(path, "\n", ",", True)
-    class_dict = build_class_key_vector(student_data, 4)
+    class_dict = import_tools.build_class_key_vector(student_data, 4)
     output = []
     for key in class_dict:
         output.append(key+","+str(class_dict[key]))
@@ -155,7 +121,7 @@ def student_series_analysis(students):
 
     return class_dict
 
-def find_successful(students):
+def spanish_check_successful(students):
     successes = []
     for student in students:
         good_student = False
@@ -181,7 +147,7 @@ def find_successful(students):
             print(len(successes))
     student_series_analysis(successes)
 
-def lable_successfull(students):
+def lable_successfull_span(students):
     req_classes = utils.list_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/req_classes.csv", "\n", ",",True)
     g1077_req = set()
     g1402_req = set()
@@ -217,6 +183,24 @@ def lable_successfull(students):
     print(g_count)
 
 
+def lable_successfull_sfsu(students):
+    core_classes = import_tools.import_sfsu_core_classes()
+
+    g_count = 0
+    for student in students:
+        courses = student.passed_classes
+        course_dict = {}
+        good_student = True
+        for course in courses:
+            course_dict[course.name] = course
+
+        for req in core_classes:
+            if req not in course_dict:
+                good_student = False
+        if good_student:
+            g_count +=1
+            student.status = "graduated"
+    print(g_count)
 
 
 def analyze_series(infile):
@@ -259,7 +243,7 @@ def build_student_vector(students, class_dict):
                 if course.name not in class_dict:#skip if not in requested classes available for training.
                     continue
                 grade = course.grade
-                if grade == 0:
+                if grade == 0: # does it need to check between spain and sfsu data.
                     grade = .1 # seperate non attempts from failed attempts.
                 name = course.name
                 if sequence_vect[class_dict[name]] != 0:
@@ -313,5 +297,16 @@ def get_course_pred_vect_key_dict(training_set, testing_set, class_pred_seq, pre
     for classes in pred_train_classes:
         key_dict[classes] = i
         i += 1
+    return key_dict
+
+def build_class_key_vector(datas, class_int): #runs through list of classes, and gives each a unique identifier.
+    key_dict = {}
+    i = 0
+    class_list = set()
+    for data in datas:
+        class_list.add(data[class_int])
+    for classes in class_list:
+        key_dict[classes] = i
+        i+=1
     return key_dict
 

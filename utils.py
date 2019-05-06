@@ -27,7 +27,7 @@ def list_to_file(path, datas, **kwargs):
         if "headers" in kwargs:
             x.write((kwargs["headers"])+"\n")
         for data in datas:
-            x.write(str(data)+"\n")
+            x.write(",".join(str(x) for x in data) + "\n")
     return
 
 def add_to_dict_set(key, value, dict_):
@@ -70,20 +70,26 @@ def sum_to_dict(key, value, dict_obj):
 def get_letter_grade(course_grade):
     if course_grade > 100:
         return "A+"
-    elif course_grade > 95:
+    elif course_grade > 92:
         return "A"
     elif course_grade > 90:
         return "A-"
-    elif course_grade > 85:
+    elif course_grade > 87:
+        return "B+"
+    elif course_grade > 82:
         return "B"
     elif course_grade > 80:
         return "B-"
-    elif course_grade > 75:
+    elif course_grade > 77:
+        return "C+"
+    elif course_grade > 72:
         return "C"
     elif course_grade > 70:
         return "C-"
-    elif course_grade > 65:
+    elif course_grade > 67:
         return "D+"
+    elif course_grade > 62:
+        return "D"
     elif course_grade > 60:
         return "D-"
     else:
