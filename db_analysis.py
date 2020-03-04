@@ -6,7 +6,7 @@ import numpy
 
 
 def generate_class_histogram_data(core_path, elective_path, repeat):
-    cnx = utils.get_connetion("advisor","passadvise","localhost","ADVISING")
+    cnx = utils.get_connection("advisor", "passadvise", "localhost", "ADVISING")
     histo_gram_dict = {}
     all_class_list = read_classes(core_path=core_path, elective_path=elective_path)
     cursor = cnx.cursor(buffered=True)
@@ -51,7 +51,7 @@ def generate_class_histogram_data(core_path, elective_path, repeat):
     return course_list, course_freq
 
 def check_core_check(core_path):
-    cnx = utils.get_connetion("advisor", "passadvise", "localhost", "ADVISING")
+    cnx = utils.get_connection("advisor", "passadvise", "localhost", "ADVISING")
     core_list = read_classes(core_path=core_path)
     core_set = set()
     for course in core_list:
@@ -106,7 +106,7 @@ def read_classes(**kwargs):
 
 
 def calc_gpa_histogram(testers):
-    cnx = utils.get_connetion("advisor","passadvise","localhost","ADVISING")
+    cnx = utils.get_connection("advisor", "passadvise", "localhost", "ADVISING")
 
     cursor = cnx.cursor(buffered=True)
     gpas = []
@@ -154,7 +154,7 @@ def calc_gpa_histogram(testers):
 
 
 def gather_student_history(testers):
-    cnx = utils.get_connetion("advisor", "passadvise", "localhost", "ADVISING")
+    cnx = utils.get_connection("advisor", "passadvise", "localhost", "ADVISING")
 
     cursor = cnx.cursor(buffered=True)
     hists = []

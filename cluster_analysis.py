@@ -4,7 +4,7 @@ from sklearn import metrics
 import plotly.plotly as py
 import plotly.graph_objs as go
 
-def cluster_analysis(cluster_data, labels, student_list, dissim_dict):
+def cluster_analysis(cluster_data, labels, student_list):
 
     db = metrics.davies_bouldin_score(cluster_data, labels)
     ch = metrics.calinski_harabaz_score(cluster_data, labels)
@@ -18,7 +18,7 @@ def cluster_analysis(cluster_data, labels, student_list, dissim_dict):
     for clust in cluster_set:
         student_set = cluster_dict[clust]
         grades = get_grades(student_set)
-        tani_measures = compare_class_tanimoto(clust, cluster_dict, dissim_dict)
+#        tani_measures = compare_class_tanimoto(clust, cluster_dict, dissim_dict)
         stat_package = {}
         stat_package['db'] = db
         stat_package['ch'] = ch
@@ -27,8 +27,8 @@ def cluster_analysis(cluster_data, labels, student_list, dissim_dict):
         stat_package['median_grade'] = np.median(grades)
         stat_package['std_grade'] = np.std(grades)
         stat_package['grades'] = grades
-        stat_package['tani_within'] = tani_measures[0]
-        stat_package['tani_without'] = tani_measures[1]
+#        stat_package['tani_within'] = tani_measures[0]
+#        stat_package['tani_without'] = tani_measures[1]
         stat_package['plot_data'] = [go.Histogram(x=grades)]
         stat_package_set[clust] = stat_package
     return stat_package_set
@@ -90,12 +90,13 @@ def compare_class_tanimoto(prime_clust, clust_dict, dissim_dict):
     return within_dist, without_dist
 
 
+
 def build_cluster_results(lables, student_list):
     dict = {}
     for x in range(0,len(lables)):
         student = student_list[x]
         clust = lables[x]
-        utils.add_to_dict(clust, student, dict)
+        utils.append_to_dict(clust, student, dict)
     return dict
 
 def format_dissim_list(sim_list):

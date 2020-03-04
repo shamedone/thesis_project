@@ -11,7 +11,7 @@ import numpy as np
 #TODO build vector of classes as part of student class, so that they can be passed to learner
 
 def main_generate_student_data(name_path, core_path, elective_path):
-    cnx = utils.get_connetion("advisor","passadvise","localhost","ADVISING")
+    cnx = utils.get_connection("advisor", "passadvise", "localhost", "ADVISING")
     name_data = utils.list_from_file(name_path, "\n", "," ,False)
     elective_data = utils.list_from_file(elective_path, "\n", ",", False)
     core_data = utils.list_from_file(core_path, "\n", "," ,False)
@@ -44,7 +44,7 @@ def generate_student(name_data, elective_list, core_list):
         #TODO : alter code so that it can escape if no more classes with prereqs are found.
         force = "none"
 
-        while course_taken < max_course and student.status != "Failed":
+        while course_taken < max_course and student.type != "Failed":
             num_to_take = random.randint(4,7) #allow students to take 4 to 7 classes
             core_eligible_count = 0
             for core_class in core_data:
@@ -135,14 +135,14 @@ def generate_student(name_data, elective_list, core_list):
                 max_course += 7
 
             if len(core_data) == 0:
-                student.status = "Success"
+                student.type = "Success"
 
             if len(core_data) == 0 and course_taken > 40:
                 max_course -= 10
 
             student.age+= 1
             if student.age > 16 and len(core_data) > 0:
-                student.status = "Failed"
+                student.type = "Failed"
 
 
             if semester == "Fall":
@@ -214,7 +214,7 @@ def test_3():
 def populate_tester_db():
     starting_id = "1"
     insert_db = [];
-    cnx = utils.get_connetion("advisor", "passadvise", "localhost", "ADVISING")
+    cnx = utils.get_connection("advisor", "passadvise", "localhost", "ADVISING")
     cursor = cnx.cursor(buffered=True)
 
     for x in range(1,145):
