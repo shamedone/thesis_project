@@ -322,7 +322,8 @@ def find_all_sequences(series_list, sem_count):
 
     return complete_series
 
-
+# gets the top N highes scoreing series from the file and processes it for seqeunce comparison. Scoring format indicates that the course sequence is
+#preceded by a score and needs to be seperated out first. Example files in git.
 def get_top_series(grade_level, hard_seq, score_format):
     if grade_level.lower() == "freshman_10":
         top_set = utils.list_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/top1_subset_all_possible_series_10_old_cir_only_score_freshman_bonus_412add_211add.csv",
