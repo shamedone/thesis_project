@@ -4,7 +4,6 @@ import utils
 import import_tools
 from operator import itemgetter
 from Bio import pairwise2
-from Bio.pairwise2 import format_alignment
 
 def build_class_transactions(students):
     transaction_dict = {}
@@ -22,6 +21,7 @@ def build_class_transactions(students):
 
     return transaction_dict
 
+#old apriori method
 def run_apriori(transaction_dict, semester_set, min_support, min_confidence):
     for semester in semester_set:
         itemsets, rules = apriori(transaction_dict[semester], min_support, min_confidence)
@@ -29,6 +29,7 @@ def run_apriori(transaction_dict, semester_set, min_support, min_confidence):
         print(itemsets)
         print(rules)
 
+#tester method
 def run_sequnce_testing():
     sequences = ("CSC100,CSC200,CSC300,MATH100,MATH200",
                  "CSC100,MATH100,MATH200,CSC200,CSC300",
@@ -68,6 +69,7 @@ def run_sequence_mining(students, min_support, filter_type):
         output_data.append([data[1], [data[0]]])
     return output_data
 
+#counts how semesters students take a course
 def course_semester_histogram(students, core_filter):
     course_histo_data = {}
     output = [["crs","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20"]]
@@ -114,7 +116,7 @@ def build_crs_hist(seq):
 
     return crs_dict
 
-
+#scoring function to score a sequence based on scores found from impact analysis
 def score_seq(seq_dict, equiv_score_map, seq_score_map):
     score = 0
     for x in range(1, len(seq_dict)+1):
@@ -156,6 +158,7 @@ def update_top_100(value, top_100):
             top_100 = sorted(top_100, key=itemgetter(0), reverse=True)
     return top_100
 
+#scores sequneces based on score map.
 def score_series_set(path, outpath, add_412, add_211, class_type):
 
     if class_type.lower() == "transfer":
@@ -234,7 +237,7 @@ def score_series_set(path, outpath, add_412, add_211, class_type):
     utils.list_to_file(outpath, top_100)
 
 
-
+#returns all possible courses that can be taken based on prereqs
 def find_possible_courses(course_history):
     possible = []
     core_prqs = import_tools.preq_map
@@ -256,6 +259,7 @@ def find_possible_courses(course_history):
             possible.append(crs)
     return possible
 
+#finds all possible semster course combinations given a starting semester
 def find_possible_semester_sequence(course_history, sem_count):
     possible_courses = find_possible_courses(course_history)
     possible_semester = []
@@ -278,6 +282,7 @@ def find_possible_semester_sequence(course_history, sem_count):
                 possible_semester.append(temp_2)
     return possible_semester
 
+#checks to see if all core courses are complete
 def check_core_incomplete(history):
     needed_crs = list(import_tools.preq_map.keys())
     temp_crs_hist = set()
@@ -290,7 +295,8 @@ def check_core_incomplete(history):
             return True
     return False
 
-
+#recursive sequence builds all possible semester sequences based on starting coures history, which can be initalized or blank ([]).
+#includes sem count to halt sequence if semester count is exceeded
 def find_all_sequences(series_list, sem_count):
     complete_series = []
     for series in series_list:
@@ -351,6 +357,12 @@ def get_top_series(grade_level, hard_seq, score_format):
 
     return parsed_series
 
+
+#scores similarity of sequences based on pairwise alignment. can be hard sequence, meaning coruess must match sequence a
+#sequence, or soft, in which names only count. Course names and sequence are combined ex: "1_CSC210", "1_CSC211, "2_CSC220.
+# For hard sequencing, the code replaces integers with letters so as long as courses are taken in same sequence, it does not
+#matter if they take them the same semesters, since it only looks at core courses. So "1_CSC210, 2_ENG100, 3_CSC220 would be
+#treated the same as "1_CSC210, 2_ENG100, 2_CSC210" as the translated sequence for each would be "A_CSC210, B_CSC220
 def compare_series(students, filter_type, level, hard_seq, score_format):
     top_series = get_top_series(level, hard_seq, score_format)
     output = []
@@ -415,6 +427,7 @@ def compare_series(students, filter_type, level, hard_seq, score_format):
         student.seq_sim_score = max_comp
         output.append(student)
     return output
+
 
 def build_series_historgram(series, score_included):
 

@@ -64,14 +64,14 @@ def iterative_sequence_tests(students, filter,  **kwargs):
             "/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/series_stats" + suffix,
             datas)
 
-#iterative impacts test wrapper
+#iterative impacts test setup
 def iterative_impact_tests(students, filter, compare_type, compare_dict, score_type, **kwargs):
     suffix = ".csv"
-    if filter:  # TODO we need to fix the labels.
+    if filter:  #if the fitler flag is true, then in splits students up in groupings, if not, it just runs them as is.
         group_types = ga.get_grouping_types(kwargs['groupings'])
         for group_set in group_types:
             print("init")
-            filtered_students = ga.filter_students(kwargs['groupings'], group_set, students, kwargs)
+            filtered_students = ga.filter_students(kwargs['groupings'], group_set, students, **kwargs)
             datas = run_impact_tests(filtered_students, compare_type, compare_dict, score_type)
 
             suffix = ga.translate_header(kwargs['groupings'], group_set)
@@ -93,10 +93,11 @@ def iterative_impact_tests(students, filter, compare_type, compare_dict, score_t
             "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/3_18" + compare_type +
             "_all_impact_stats" + suffix, datas[1])
 
+#impact analysis wrapper
 def run_impact_tests(students, comp_type, comp_dict, score_type):
     #results_preq = ca.iterative_impact_prereq(students)
 
-    #results_preq = ca.iterative_impact_comp("prereqs", students, comp_type, comp_dict, score_type)
+    #results_preq = ca.iterative_impact_comp("prereqs", students, comp_type, comp_dict, score_type) #I dont use this one any more, just easier to run allall
     results_elect = ca.iterative_impact_comp("allall_cs", students, comp_type, comp_dict, score_type)
     if len(results_elect) == 1:
         results_elect = []
@@ -252,7 +253,7 @@ def series_analysis():
 
 def histo_analysis():
     students = it.package_student_data()
-    filtered_students = ga.filter_students(["admin_descript"], ["Transfer_Start"], students) # this wont work now, need to change to godes
+    filtered_students = ga.filter_students(["admin_descript"], ["Transfer_Start"], students)
     datas = sa.course_semester_histogram(filtered_students, True)
     utils.list_to_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/xfer_class_histo.csv", datas)
 

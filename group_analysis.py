@@ -61,7 +61,7 @@ def get_grouping_types(groupings):
 
 #filters students based on list obejects [[categoryA, categoryB], [criteraA, critieraB]]
 #students removed if they dont match each criteria to each category
-def filter_students(categories, criterias, students, kwargs):
+def filter_students(categories, criterias, students, **kwargs):
 
     skip_list = set()
     isolation = False # Isolaiton variable gives funciton ability to isoloate out a single group, ie. freshman, transfer etc.
