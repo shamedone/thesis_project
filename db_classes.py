@@ -1,25 +1,27 @@
-from random import randint
 import utils
 
 class Student:
-    def __init__(self, id_num, sex, ethnic, age, resident_status, standing, admin_descript):
+    def __init__(self, id_num, sex, ethnic, age, resident_status, standing, admin_descript, entry_major, final_major,
+                 spring_19_major):
         self.sex = sex #varchar
         self.ethnic = ethnic #varchar
         self.age = age #archar
         self.resident_status = resident_status#varchar
-        self.standing = standing #varchar
-        self.passed_classes = [] # do we need both of these? skip
-        self.course_history = [] # do we need we both? we have course history? skip
+        self.entry_standing = standing #varchar
+        self.final_standing = standing #varchar
+        self.passed_classes = []
+        self.course_history = []
         self.id_num = id_num #varchar
         self.status = "dropout"  #TODO find all student.type, fill in all data here
         self.course_seq_dict = {}
         self.sem_avg_grades = {} #?
         self.sem_seq_dict = {} #?
         self.unique_courses = {}
-        self.major = "" #varchar
+        self.major = "CSC" #varchar
         self.admin_descript = admin_descript #varchar
         self.fp_dict = {}
         self.spring_19_flag = False
+        self.spring_19_major = spring_19_major
         self.pred = "NA"
         self.pred_class = "NA"
         self.final_gpa = 0
@@ -36,11 +38,18 @@ class Student:
         self.first_sem = 90000
         self.prior_units = 0
         self.final_gen_gpa = 0
+        self.entry_major = entry_major
+        self.final_major = final_major
+        self.global_status = "non_cs_or_dropout"
+        self.missing_classes = ""
+        self.total_focus_dict = {}
 
+    #Change some names to match course descriptions
     @staticmethod
     def check_course_name(course):
-        if course.name == "CSC313":
-            course.name = "CSC220"
+        # Chose to not include CSC 313 as syllabus appears to different
+        #if course.name == "CSC313":
+        #    course.name = "CSC220"
 
         if course.name == "CSC330":
             course.name = "CSC230"
@@ -49,8 +58,9 @@ class Student:
             course.name = "CSC648"
         return
 
+
     def add_course(self, course):
-        #self.check_course_name(course)
+        self.check_course_name(course)
         if course.name in self.unique_courses:
             old_course = self.unique_courses[course.name]
             course.repeat += 1
@@ -65,12 +75,13 @@ class Student:
 
         if course.semester < self.first_sem:
             self.first_sem = course.semester
+            self.entry_standing = course.student_standing
             check = course.total_units - course.sfsu_units
             if check > 0:
                 self.prior_units = int(check)
 
-        self.course_history.append(course)
 
+        self.course_history.append(course)
 
 
 
@@ -95,39 +106,6 @@ class Student:
                 return False
         return True
 
-    def check_bonus(self, prereqs):
-        if prereqs == ['']:
-            return False
-        for req in prereqs:
-
-            if req in self.passed_classes:
-                continue
-            elif "^" in req:
-                or_reqs = req.split("^")
-                fail = True
-                for or_req in or_reqs:
-                    if or_req in self.passed_classes:
-                        fail = False
-                if fail:
-                    return False
-                else:
-                    continue
-            else:
-                return False
-        return True
-
-
-    def adjust_grade(self, course, course_count):
-        grade_adjust = float(course[1])
-        grade_adjust += (randint(-20,20) / 1000) #vary course grade results slightly
-        if (course[3] == 1 and course_count >= 5) or course_count > 5:
-            grade_adjust -= .1
-
-        if self.check_bonus(course[5].split(";")): #check fo bonus classes
-            grade_adjust += .1
-            #print("Bonus :" + course[0])
-        return grade_adjust
-
     def calc_semester_load(self):
         load_dict = {}
         for sem in self.sem_seq_dict:
@@ -136,6 +114,17 @@ class Student:
         for course in self.course_history:
             course.semester_load = load_dict[course.semester]
 
+        return
+
+
+    def update_final_semester (self):
+        if self.dropout_semester == 0:
+            raise Warning("Dropout semesters not calculated. Run label dropouts first")
+        for course in self.course_history:
+            if course.semester == self.dropout_semester:
+                course.isfinal_semester = True
+
+        return
 
 class Course:
     def __init__(self, name, grade_str, semester, student_age, student_standing, ref_id, student_id, term_gpa, sfsu_gpa, \
@@ -169,6 +158,8 @@ class Course:
         self.college = college
         self.department = department
         self.total_units = total_units
+        self.course_focus_dict = {}
+        self.isfinal_semester = False
 
 
         if prereqs is None:

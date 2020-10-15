@@ -101,6 +101,19 @@ def build_seq_sem_dict(seq):
         utils.append_to_dict(sem, course, sem_dict)
     return sem_dict
 
+def build_crs_hist(seq):
+    crs_dict = {}
+    for crs in seq:
+        sem = int(crs.split("_")[0])
+        course = crs.split("_")[1]
+        if course not in crs_dict:
+            crs_dict[course] = [0]*11
+        temp = crs_dict[course]
+        temp[sem] = temp[sem]+1
+        crs_dict[course] = temp
+
+    return crs_dict
+
 
 def score_seq(seq_dict, equiv_score_map, seq_score_map):
     score = 0
@@ -143,18 +156,30 @@ def update_top_100(value, top_100):
             top_100 = sorted(top_100, key=itemgetter(0), reverse=True)
     return top_100
 
-def score_series_set(path, outpath, add_412, add_211):
+def score_series_set(path, outpath, add_412, add_211, class_type):
 
-    seq_score_map = utils.dict_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/sequence_score_map_xfer_30_no_lower_crs.csv",
-                                        0,1,"\n", ",", True)
-    equiv_score_map = utils.dict_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/equiv_score_map_xfer_30_no_lower_crs.csv",
-                                        0,1,"\n", ",", True)
-    #seq_score_map = utils.dict_from_file(
-    #    "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/sequence_score_map_50.csv",
-    #    0, 1, "\n", ",", True)
-    #equiv_score_map = utils.dict_from_file(
-    #    "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/concurrent_score_map_50.csv",
-    #    0, 1, "\n", ",", True)
+    if class_type.lower() == "transfer":
+        seq_score_map = utils.dict_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/subset_transfer_sequence_score_map_25.csv",
+                                            0,1,"\n", ",", True)
+        equiv_score_map = utils.dict_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/subset_transfer_concurrent_score_map_25.csv",
+                                            0,1,"\n", ",", True)
+    elif class_type.lower() == "all":
+        seq_score_map = utils.dict_from_file(
+            "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/49_cs_sequence_score_map_25.csv",
+            0, 1, "\n", ",", True)
+        equiv_score_map = utils.dict_from_file(
+            "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/49_cs_concurrent_score_map_25.csv",
+            0, 1, "\n", ",", True)
+    else:
+        seq_score_map = utils.dict_from_file(
+            "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/combo_score_seq_mod_bonus.csv",
+            0, 1, "\n", ",", True)
+        equiv_score_map = utils.dict_from_file(
+            "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/combo_score_equiv_mod_bonus.csv",
+            0, 1, "\n", ",", True)
+
+
+
     i = 0
 
     top_100 = []
@@ -178,6 +203,12 @@ def score_series_set(path, outpath, add_412, add_211):
                     if "CSC210" in line[sem_x] and add_211:
                         sem = line[sem_x].split("_")[0]
                         line.insert(sem_x+1, sem+"_CSC211")
+                    #if "PHYS220" in line[sem_x]:  #Typically unneeded due to presence of PHYS230/222 scores that capture same info.
+                    #    sem = line[sem_x].split("_")[0]
+                    #    line.insert(sem_x+1, sem+"_PHYS222")
+                    #if "PHYS230" in line[sem_x]:
+                    #    sem = line[sem_x].split("_")[0]
+                    #    line.insert(sem_x+1, sem+"_PHYS232")
 
             score_line = []
             for crs in line:
@@ -265,9 +296,9 @@ def find_all_sequences(series_list, sem_count):
     for series in series_list:
         #print(sem_count)
         if (check_core_incomplete(series)):
-            if sem_count >= 10:
+            if sem_count >= 8:
                 continue
-            if sem_count > 8 and not any(crs.endswith("CSC340") for crs in series):
+            if sem_count > 6 and not any(crs.endswith("CSC340") for crs in series):
                 continue
             #print(series)
             new_series_list = find_possible_semester_sequence(series, sem_count+1)
@@ -284,26 +315,35 @@ def find_all_sequences(series_list, sem_count):
     return complete_series
 
 
-def get_top_series(grade_level, hard_seq):
-    if grade_level == "freshman":
-        top_set = utils.list_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/seq_only_final_top300_freshman_start_add412_211_10max.csv",
+def get_top_series(grade_level, hard_seq, score_format):
+    if grade_level.lower() == "freshman_10":
+        top_set = utils.list_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/top1_subset_all_possible_series_10_old_cir_only_score_freshman_bonus_412add_211add.csv",
+                                      "\n", ",", False)
+    elif grade_level.lower() == "freshman_8":
+        top_set = utils.list_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/7_25_top_1_impact_summary_seq.csv",
                                       "\n", ",", False)
     elif grade_level == "sfsu_seq_check":
         top_set = utils.list_from_file(
             "/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/SFSU_Recommended_Seq.csv",
             "\n", ",", False)
     else:
-        top_set = utils.list_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/seq_only_final_top300_xfer_start_add412_8max.csv",
+        top_set = utils.list_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/all_possible_series_xfer_6_scored_412add.csv",
                                       "\n", ",", False)
     parsed_series = []
     for series in top_set:
         temp_list = []
-        for ser in series:
+        y =0
+        if score_format:
+            y=1
+        for x in range (y, len(series)):
+            ser = series[x]
+            if score_format:
+                ser = ser.strip("[]\\' ")
             crs = ser.split("_")[1]
             count = ser.split("_")[0]
             if hard_seq:
-                print(ser)
                 temp_list.append(counter_list[int(count)]+"_"+crs)
+                #temp_list.append(count+"_"+crs)
             else:
                 temp_list.append(crs)
 
@@ -311,18 +351,27 @@ def get_top_series(grade_level, hard_seq):
 
     return parsed_series
 
-def compare_series(students, filter_type, level, hard_seq):
-    top_series = get_top_series(level, hard_seq)
+def compare_series(students, filter_type, level, hard_seq, score_format):
+    top_series = get_top_series(level, hard_seq, score_format)
     output = []
+    if "sfsu" in level:
+        level = "freshman_8"
     for student in students:
+        if student.status != "graduated_cs":
+            continue
+        if student.admin_descript != "1" and "freshman" in level.lower():
+            continue
+        if student.admin_descript != "2" and "transfer" in level.lower():
+            continue
         skip = False
-        #print(student.id_num)
+        print(student.id_num)
         temp_list = []
         semester_keys = list(student.course_seq_dict.keys())
         semester_keys.sort()
         counter = 1
         for seq_int in semester_keys:
             student_sem_hist = student.course_seq_dict[seq_int]
+            found = False
             for x in student_sem_hist:
                 if filter_type == 'generic_ge':
                     if x.course_type == "ge":
@@ -331,11 +380,26 @@ def compare_series(students, filter_type, level, hard_seq):
                     if x.course_type == "core" or x.course_type == "bonus":
                         temp_list.append(x.name)
                 elif filter_type == "cs_only_seq":
-                    if x.course_type == "core" or x.course_type == "bonus":
-                        temp_list.append(counter_list[counter] + "_" + x.name)
+                    if x.course_type == "core" or x.course_type == "bonus" or x.name in ["CSC412", "CSC211"]:
+                        if hard_seq:
+                            print(counter_list[counter])
+                            temp_list.append(counter_list[counter] + "_" + x.name)
+                            #temp_list.append(str(seq_int) + "_" + x.name)
+                            found = True
+                        else:
+                            temp_list.append(x.name)
+
                 else:
-                    temp_list.append(counter_list[counter]+"_"+x.name)
-            counter +=1
+                    temp_list.append(counter_list[counter] + "_" + x.name)
+                    found = True
+#                    if x.course_type == "core" or x.course_type == "bonus":
+#                        temp_list.append(str(seq_int) + "_" + x.name)
+#                else:
+#                    temp_list.append(str(seq_int)+"_"+x.name)
+
+            if found:
+                counter +=1
+
         max_comp = 0
         if len(temp_list) == 0:
             output.append(student)
@@ -344,37 +408,30 @@ def compare_series(students, filter_type, level, hard_seq):
             #print(comp_ser)
             score = pairwise2.align.globalxx(temp_list, comp_ser, score_only=True)
             #print(score)
+            if score == []:
+                continue
             if score > max_comp:
                 max_comp = score
         student.seq_sim_score = max_comp
         output.append(student)
     return output
 
+def build_series_historgram(series, score_included):
+
+    all_series = []
+    for data in series:
+        x = 0
+        if score_included:
+            x+=1
+        for y in range(x, len(data)):
+            all_series.append(data[y].strip("[]\\' "))
+    dict = build_crs_hist(all_series)
+    output = []
+    for data in dict:
+        output.append([data, str(dict[data]).strip("[]")])
+    return output
+
+
 counter_list = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "i", "l", "m", "n", "o", "p", "q",
                   "r", "s", "t", "u", "v", "w", "x", "y", "z","aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii"]
 
-#test = find_possible_semester_sequence(["0_CSC210", "0_MATH226", "0_MATH227", "0_PHYS220", "0_PHYS230", "0_CSC220", "0_CSC230"], 1)
-#datas = find_all_sequences(test, 1)
-#print(datas)
-#utils.list_to_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/all_possible_series_xfer_CSC210_230_M67_P2030.csv", datas)
-
-#test = find_possible_semester_sequence([], 1)
-#datas = find_all_sequences(test, 1)
-#print(datas)
-#utils.list_to_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/all_possible_series_8.csv", datas)
-
-#test = find_possible_semester_sequence(["1_MATH226", "1_CSC210", "1_CSC211"], 2)
-#datas = find_all_sequences(test, 2)
-#print(datas)
-#utils.list_to_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/all_possible_series_10_math226_csc210_211.csv", datas)
-
-#test = find_possible_semester_sequence([], 1)
-#datas = find_all_sequences(test, 1)
-#print(datas)
-#utils.list_to_file("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/all_possible_series_10.csv", datas)
-
-#score_series_set("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/all_possible_series_10.csv",
-#                "/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/top_100_series_8_redo_clean_2.csv", True, True)
-
-#score_series_set("/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/SFSU_Recommended_Seq.csv",
-#                 "/Users/thomasolson/Documents/workspace/advising_revamp/series analysis/SFSU_Recommended_Seq_score.csv", False, False)

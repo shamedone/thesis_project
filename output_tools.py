@@ -7,33 +7,39 @@ def students_to_pandas(students, **kwargs):
     all_data = []
     for student in students:
         base_data = [student.id_num, decoder["sex"][int(student.sex)], decoder["ethnicity"][int(student.ethnic)],
-                     decoder["resident_status"][int(student.resident_status)], decoder["admin_descript"][int(student.admin_descript)],
-                     student.status, student.prep_assess, student.prep_assess_summary,
-                     student.type_descript, student.type_descript_summary, student.final_gpa, student.final_cs_gpa, student.final_gen_gpa,
+                     decoder["resident_status"][int(student.resident_status)],
+                     decoder["admin_descript"][int(student.admin_descript)],
+                     decoder["entry_standing"][int(student.entry_standing)],
+                     decoder["entry_standing"][int(student.final_standing)],
+                     student.status, student.prep_assess, decoder["prep_assess_summary"][int(student.prep_assess_summary)], student.entry_major, #TODO figure out error with prepassess
+                     student.final_major, student.spring_19_major, student.type_descript, student.type_descript_summary,
+                     student.global_status, student.final_gpa,  student.final_cs_gpa, student.final_gen_gpa,
                      student.serious, student.first_sem, student.dropout_semester, student.prior_units]
 
         for course in sorted(student.course_history, key=lambda x: x.semester):
             line_data = []
             line_data.extend(base_data)
-            line_data.extend([course.student_age, decoder["student_level"][int(course.student_standing)],
+            line_data.extend([course.student_age, decoder["entry_standing"][int(course.student_standing)],
                               course.semester, course.seq_int, course.name,
                               course.equiv_name, course.course_type, course.grade_str, int(course.grade),
                               course.term_units, course.term_gpa, course.sfsu_units, course.sfsu_gpa, course.grad_flag,
-                              course.spring_19_flag, course.ge_load, course.tech_load, course.repeat, course.college,
-                              course.department])
+                              course.spring_19_flag, course.ge_load, course.tech_load, course.repeat, course.isfinal_semester,
+                              course.college, course.department])
             if 'student_prediction' in kwargs:
                 line_data.extend([student.pred, student.pred_class])
             if 'course_prediction' in kwargs:
                 line_data.extend([course.pred, course.pred_class])
             if 'sequence_score' in kwargs:
                 line_data.extend([student.seq_sim_score])
+            line_data.append(student.missing_classes)
             all_data.append(line_data)
-    columns = ['student_id', "sex", "ethnic_desc", "resident_stat", "admin_desc", "student_status",
-               "student_prep_assess", "prep_assess_summary", "type_descript", "type_descript_summary", "final_gpa",
-               "final_cs_gpa", "final_gen_gpa", "serious_student", "first_semester", "dropout_semester", "prior_units", "student_age",
+    columns = ['student_id', "sex", "ethnic_desc", "resident_stat", "admin_desc", 'entry_standing', "final_standing",
+               "student_status", "student_prep_assess", "prep_assess_summary", "entry_major", "final_major",
+               "spring_19_major", "type_descript", "type_descript_summary", "global_status","final_gpa", "final_cs_gpa",
+               "final_gen_gpa", "serious_student", "first_semester", "dropout_semester", "prior_units", "student_age",
                "student_standing","semester", "class_seq", "course", "course_equiv","course_type", "grade_str",
                "grade_int", "term_units", "term_gpa", "sfsu_units", "sfsu_gpa", "graduated", "spring_19", "ge_load",
-               "tech_load", "repeat", "college", "department"]
+               "tech_load", "repeat", "is_final_sem", "college", "department", "missing_classes"]
     if 'student_prediction' in kwargs:
         columns.extend([kwargs['student_prediction'] + "_predict", kwargs['student_prediction'] + "_pred_class"])
     if 'course_prediction' in kwargs:
@@ -56,9 +62,11 @@ def students_to_pandas(students, **kwargs):
 
     return df
 
+
 def pandas_to_csv(df, outpath):
     df.to_csv(outpath)
 
+#convert dict output to list
 def dictionary_output_to_list(dictionary, output_type):
     output = []
     if output_type == "count":  # count types refer to results where we are getting numbers as reusults : sex
@@ -82,6 +90,7 @@ def dictionary_output_to_list(dictionary, output_type):
     return output
 
 
+#decorder for int to string labels from csv
 decoder = {
     "prep_assess": {#
         0:"OK",
@@ -90,8 +99,8 @@ decoder = {
         3:"UN_PHYS;UN_MATH",
     },
     "prep_assess_summary": {#
-        0:"OK_PREP",
-        1:"UNPREPARED",
+        0:"ok_prep",
+        1:"unprepared",
     },
     "sex":{#
         0: "male",
@@ -123,11 +132,11 @@ decoder = {
         2: "Transfer_Start",
         3: "Transitory_Start",
     },
-    "student_level" : {
-        1: "Freshman",
-        2: "Sophomore",
-        3: "Junior",
-        4: "Senior",
+    "entry_standing" : {
+        1: "Freshman_entry",
+        2: "Sophomore_entry",
+        3: "Junior_entry",
+        4: "Senior_entry",
     },
     "serious" : {
         0: "Not_Serious",

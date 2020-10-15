@@ -3,8 +3,9 @@ import sf_coder
 from db_classes import Course
 from db_classes import Student
 from dataset_stage import calc_sem_avg_grade
+from copy import deepcopy
 
-
+#adds course to student object
 def add_to_student_obj(student_id, course, dict_, student_data, kwargs):
     if student_id in dict_:
         temp = dict_[student_id]
@@ -12,13 +13,23 @@ def add_to_student_obj(student_id, course, dict_, student_data, kwargs):
         if len(kwargs) > 0:  # if there are keyword args then its a sfsu type with more data
             if temp.age > int(student_data[kwargs["age"]]):
                 temp.age = int(student_data[kwargs["age"]])
-            if temp.standing > int(student_data[kwargs["standing"]]):
-                temp.standing = int(student_data[kwargs["standing"]])
+            if temp.final_standing > int(student_data[kwargs["standing"]]):
+                temp.final_standing = int(student_data[kwargs["standing"]])
             if course.grad_flag == "Y":
-                temp.status = "graduated"
+                if "Computer Sci" in temp.final_major:
+                    temp.status = "graduated_cs"
+                    temp.global_status = "cs"
+                else:
+                    temp.status = "graduated_non_cs"
             if course.spring_19_flag == "Y":
                 temp.spring_19_flag = True
-                temp.status = "in progress"
+                print(temp.spring_19_major)
+                if "Computer Sci" in temp.spring_19_major:
+                    temp.status = "cs_in_progress"
+                    temp.global_status = "cs"
+                else:
+                    temp.status = "maj_change_in_progress"
+                    temp.spring_19_major = temp.final_major
         dict_[student_id] = temp
     else:
         if len(kwargs) == 0:  # if no kwargs then there is no data.
@@ -26,10 +37,13 @@ def add_to_student_obj(student_id, course, dict_, student_data, kwargs):
         else:
             student = Student(student_id, int(student_data[kwargs["sex"]]), int(student_data[kwargs["ethnic"]]),
                               int(student_data[kwargs["age"]]), int(student_data[kwargs["resident_status"]]),
-                              int(student_data[kwargs["standing"]]), int(student_data[kwargs["admin_descript"]]))
+                              int(student_data[kwargs["standing"]]), int(student_data[kwargs["admin_descript"]]),
+                              student_data[kwargs["entry_major"]], student_data[kwargs["final_major"]],
+                              student_data[kwargs["spring_19_major"]])
         student.add_course(course)
         dict_[student_id] = student
 
+#builds student dict from raw file
 def build_student_dict(student_data, **kwargs):
     #   returns dict of student objs, complete with course work.
     student_dict = {}
@@ -59,7 +73,8 @@ def build_student_dict(student_data, **kwargs):
                             crs_type_look_up[data[kwargs["crs_abbr"]]+str(data[kwargs["crs_num"]])],
                             data[kwargs["grad_flag"]], float(data[kwargs["term_units"]]),
                             float(data[kwargs["sfsu_units"]]), data[kwargs["spring_19_flag"]],
-                            data[kwargs["crs_college_long"]], data[kwargs["crs_dept_long"]], float(data[kwargs["total_units"]]))
+                            data[kwargs["crs_college_long"]], data[kwargs["crs_dept_long"]],
+                            float(data[kwargs["total_units"]]))
 
         add_to_student_obj(student_id, course, student_dict, data, kwargs)
     return student_dict
@@ -67,38 +82,41 @@ def build_student_dict(student_data, **kwargs):
 
 
 
-
+#saves student to database
 def persist_student_data(students):
     cnx = utils.get_connection()
     cursor = cnx.cursor(buffered=True)
-    sql = "insert into student_data (student_id, sex, age, resident_status, standing, status, major, admin_descript," \
+    sql = "insert into student_data (student_id, sex, age, resident_status, entry_standing, final_standing, status, major, admin_descript," \
           "spring_19_flag, ethnicity, dropout_semester, first_semester, prior_units, type_descript, type_descript_summary," \
-          "prep_assess, prep_assess_summary, final_gpa, final_cs_gpa, final_gen_gpa) values (%s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+          "prep_assess, prep_assess_summary, final_gpa, final_cs_gpa, final_gen_gpa, entry_major, final_major, spring_19_major," \
+          "global_status, missing_classes, serious_student) values " \
+          "(%s, %s, %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
 
     for student in students:
-        key = (student.id_num, student.sex, student.age, student.resident_status, student.standing, student.status,
-               student.major, student.admin_descript, student.spring_19_flag, student.ethnic, student.dropout_semester,
+        key = (student.id_num, student.sex, student.age, student.resident_status, student.entry_standing, student.final_standing,
+               student.status, student.major, student.admin_descript, student.spring_19_flag, student.ethnic, student.dropout_semester,
                student.first_sem, student.prior_units, student.type_descript, student.type_descript_summary, student.prep_assess,
-               student.prep_assess_summary, student.final_gpa, student.final_cs_gpa, student.final_gen_gpa)
+               student.prep_assess_summary, student.final_gpa, student.final_cs_gpa, student.final_gen_gpa, student.entry_major,
+               student.final_major, student.spring_19_major, student.global_status, student.missing_classes, student.serious)
         cursor.execute(sql, key)
         persist_class_data(cnx, student.course_history)
     cnx.commit()
     cursor.close()
     cnx.close()
 
-
+#saves course data to database
 def persist_class_data(cnx, course_data):
     cursor = cnx.cursor(buffered=True)
     sql = "insert into course_data (ref_id, course_name, grade, semester, student_age, student_standing, repeat_, " \
           "prior_id, student_id, grade_str, term_gpa, sfsu_gpa, term_units, sfsu_units, grad_flag, " \
-          "spring_19_flag, seq_int, type, college, department, tech_load, ge_load) values (%s, %s, %s, %s,%s,%s,%s,%s,%s,%s, %s, %s, %s," \
-          "%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+          "spring_19_flag, seq_int, type, college, department, tech_load, ge_load, is_final_semester) values"\
+          "(%s, %s, %s, %s,%s,%s,%s,%s,%s,%s, %s, %s, %s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
     for course in course_data:
         key = (course.ref_id, course.name, course.grade, course.semester, course.student_age, course.student_standing,
                course.repeat, course.prior_id, course.student_id, course.grade_str,
                course.term_gpa, course.sfsu_gpa, course.term_units, course.sfsu_units, course.grad_flag,
                course.spring_19_flag, course.seq_int, course.course_type, course.college, course.department,
-               course.tech_load, course.ge_load)
+               course.tech_load, course.ge_load, course.isfinal_semester)
         cursor.execute(sql, key)
     cnx.commit()
     cursor.close()
@@ -158,7 +176,7 @@ def update_type_status(labels):
     cursor.close()
     cnx.close()
 
-
+#pulls student data from database to create student objects
 def pull_student_data(cnx, **kwargs):
     student_dict = {}
     student_list = []
@@ -167,7 +185,8 @@ def pull_student_data(cnx, **kwargs):
     cursor.execute(sql)
     results = cursor.fetchall()
     for result in results:
-        temp_student = Student(result[0], result[1], result[9], result[2], result[3], result[4], result[7])
+        temp_student = Student(result[0], result[1], result[9], result[2], result[3], result[4], result[7], result[22],
+                               result[23], result[24])
         temp_student.status = result[5]
         temp_student.major = result[6]
         temp_student.spring_19_flag = result[8]
@@ -182,6 +201,11 @@ def pull_student_data(cnx, **kwargs):
         temp_student.first_sem = result[18]
         temp_student.prior_units = result[19]
         temp_student.final_gen_gpa = result[20]
+        temp_student.final_standing = result[21]
+        temp_student.global_status = result[25]
+        temp_student.missing_classes = result[26]
+
+
         student_list.append(temp_student)
     cursor.close()
 
@@ -198,7 +222,7 @@ def pull_student_data(cnx, **kwargs):
 
     return student_dict
 
-
+#pulls course data from database for students and adds to student object
 def pull_course_data(cnx, students):
     cursor = cnx.cursor(buffered=True)
     sql = "select * from course_data where student_id = %s"
@@ -218,6 +242,7 @@ def pull_course_data(cnx, students):
             temp_course.tech_load = result[18]
             temp_course.ge_load = result[19]
             temp_course.equiv_name = result[20]
+            temp_course.isfinal_semester = result[25]
 
             temp_student = students[temp_course.student_id]
             temp_student.add_course(temp_course)
@@ -236,12 +261,16 @@ def pull_course_data(cnx, students):
                 temp.append(course)
                 student.course_seq_dict[seq_int] = temp
         list_output.append(student)
+
+
     calc_sem_avg_grade(list_output)
+    calc_focus_dicts(list_output)
     cursor.close()
     return list_output
 
-
+#overview function for importing student data from database, first calls student data and then course to create list of student objects
 def package_student_data(**kwargs):
+    print("hi")
     cnx = utils.get_connection(user="advisor", password="passadvise", host="localhost", database="SFSU_STUDENT_HISTORY")
     students = pull_student_data(cnx, **kwargs)
     packaged_data = pull_course_data(cnx, students)
@@ -300,7 +329,7 @@ def update_student_serious(change_list):
     cursor = cnx.cursor(buffered=True)
     sql = "update student_data set serious_student = %s where student_id = %s"
     for change in change_list:
-        key = (False, change)
+        key = (True, change)
         cursor.execute(sql, key)
     cnx.commit()
     cursor.close()
@@ -308,6 +337,89 @@ def update_student_serious(change_list):
     return
 
 
+#builds dict for each student that counts how many courses they take in each college and department.
+def calc_focus_dicts(students):
+
+    for student in students:
+        global_college_dict = {}
+        global_dept_dict = {}
+        semester_focus_dict = {}
+        crs_seqs = student.course_seq_dict
+        for x in range(1, len(crs_seqs)+1):
+            courses = crs_seqs[x]
+            college_dict = {}
+            dept_dict = {}
+            for crs in courses:
+                utils.sum_to_dict(crs.department, 1, dept_dict)
+                utils.sum_to_dict(crs.college, 1, college_dict)
+                utils.sum_to_dict(crs.department, 1, global_dept_dict)
+                utils.sum_to_dict(crs.college, 1, global_college_dict)
+            temp = {}
+            temp['college'] = college_dict
+            temp['deptartment'] = dept_dict
+            for crs in courses:
+                crs.course_focus_dict = temp
+
+            temp = {}
+            temp['college'] = global_college_dict.copy()
+            temp['deptartment'] = global_dept_dict.copy()
+            semester_focus_dict[x] = temp
+        student.total_focus_dict = semester_focus_dict
+    return
+
+#code to combine PHYS220/222 and PHYS230/232
+def combine_phys(students):
+    for student in students:
+        update = False
+        phys230_grade = 0
+        phys232_grade = 0
+        phys222_grade = 0
+        phys220_grade = 0
+
+        if "PHYS230" in student.unique_courses:
+            phys230_grade = student.unique_courses["PHYS230"].grade
+        if "PHYS232" in student.unique_courses:
+            phys232_grade = student.unique_courses["PHYS232"].grade
+        if "PHYS220" in student.unique_courses:
+            phys220_grade = student.unique_courses["PHYS220"].grade
+        if "PHYS222" in student.unique_courses:
+            phys222_grade = student.unique_courses["PHYS222"].grade
+
+        if phys232_grade > 0:
+            phys230_combo_grade = round((phys230_grade * 3)/4 + (phys232_grade/4))
+        else:
+            phys230_combo_grade = phys230_grade
+
+        if phys222_grade > 0:
+            phys220_combo_grade = round((phys220_grade * 3)/4 + (phys222_grade/4))
+        else:
+            phys220_combo_grade = phys220_grade
+
+        if phys230_combo_grade > 0:
+            print(phys230_combo_grade)
+            try:
+                phys230_combo_course = deepcopy(student.unique_courses["PHYS230"])
+            except:
+                continue
+            phys230_combo_course.name = "PHYS230COMBO"
+            phys230_combo_course.grade = phys230_combo_grade
+            phys230_combo_course.grade_str = utils.get_letter_grade(phys230_combo_grade)
+            student.add_course(phys230_combo_course)
+
+
+        if phys220_combo_grade > 0:
+            print(phys220_combo_grade)
+
+            try:
+                phys220_combo_course = deepcopy(student.unique_courses["PHYS220"])
+            except:
+                continue
+            phys220_combo_course.name = "PHYS220COMBO"
+            phys220_combo_course.grade = phys220_combo_grade
+            phys220_combo_course.grade_str = utils.get_letter_grade(phys220_combo_grade)
+            student.add_course(phys220_combo_course)
+
+    return students
 
 
 preq_map = {
@@ -323,13 +435,18 @@ preq_map = {
     "CSC256": ["CSC230"],
     "CSC300": ["CSC210"],
     "CSC340": ["CSC220","CSC230","MATH227"],
-    "CSC413": ["CSC220"],
+#    "CSC413": ["CSC220"],
+    "CSC413": ["CSC340"],
     "CSC415": ["MATH324","PHYS230","CSC256","CSC340"],
     "CSC510": ["CSC340","MATH324"],
+#
+
     "CSC520": ["CSC220","CSC230", "MATH325"],
     "CSC600": ["CSC413", "CSC510"],
+#    "CSC648": ["CSC317","CSC413"],
     "CSC648": ["CSC413"],
     "CSC210": [],
-    "MATH226": []
+#    "CSC317": ["CSC220"],
 #    "CSC211": [""]
+    "MATH226": []
     }

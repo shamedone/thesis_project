@@ -1,5 +1,3 @@
-import utils
-
 def translate_sfsu_data(line):
     skipset = {"AU", "W", "RP", "RD",""}
 

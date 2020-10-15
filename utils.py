@@ -65,6 +65,9 @@ def dict_to_list(dict_):
 
 
 def list_to_file(path, datas, **kwargs):
+    if len(datas) == 0:
+        print("no data passed to util")
+        return
     with open(path, "w") as x:
         if "headers" in kwargs:
             x.write((kwargs["headers"])+"\n")
@@ -212,7 +215,7 @@ def group_gpa_class(gpa):
 def translate_grade(grade):
     if grade == "A":
         return 4.0
-    elif grade == "A-+":
+    elif grade == "A-":
         return 3.7
     elif grade == "B+":
         return 3.3

@@ -1,471 +1,660 @@
+import pandas as pd
+import numpy as np
 import utils
-import dataset_stage as ds
-import numpy as np
-from sklearn.cluster import KMeans, AffinityPropagation, AgglomerativeClustering, MeanShift
-import cluster_analysis as ca
-import os
-from sklearn import metrics
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn import datasets, svm
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_samples, silhouette_score
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.naive_bayes import ComplementNB
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn import svm
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_predict
+from sklearn.metrics import confusion_matrix
+from sklearn import preprocessing
+from sklearn import linear_model
+from sklearn.feature_selection import RFECV, SelectKBest, f_classif, SelectPercentile
+from sklearn.ensemble import GradientBoostingClassifier
 
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import numpy as np
+def simplify_grade(grade):
+    grade = int(grade)
+    if grade > 89:
+        return "A"
+    elif grade > 79:
+        return "B"
+    elif grade > 69:
+        return "C"
+    elif grade > 59:
+        return "D"
+    else:
+        return "F"
 
-import random
+def simplify_grade_int(grade):
+    grade = int(grade)
+    if grade > 89:
+        return 90
+    elif grade > 79:
+        return 80
+    elif grade > 69:
+        return 70
+    elif grade > 59:
+        return 50
+    else:
+        return 40
+
+def simplify_grade_pf(grade):
+    if grade in ["A", "B", "C"]:
+        return 1
+    else:
+        return 0
+
+def simplify_status(status):
+    if "dropout" in status or "non" in status:
+        return 0
+    else:
+        return 1
 
 
-def split_dataset_old(students, **kwargs): #need to revamp for sfsu - remove one semesters wonders,
-    test_set = []
-    train_set = []
-    type_dict = {}
+#create predictor test frame, target is the field that is to be predicted, and exclusive is T/F indicating if only
+#to include students with all course fields
+def create_predictor_data_frame(students, student_fields, course_fields, course_list, target, exclusive):  # cor_fields names
+    columns = []
+    all_data = []
 
-    if "one_year_run" in kwargs:
-        for student in students:
-            if len(student.sem_seq_dict) == 1 and student.sem_seq_dict[1] == kwargs['one_year_run']:
-                check = random.random()
-                if check > .7:
-                    train_set.append(student)
+    if "status" in student_fields:
+        columns.append("status")
+    if "sex" in student_fields:
+        columns.append("sex")
+    if "ethnicity" in student_fields:
+        columns.append("ethnicity")
+    if "resident_status" in student_fields:
+        columns.append("resident_status")
+    if "admin_decript" in student_fields:
+        columns.append("admin_decript")
+    if "prep_summary" in student_fields:
+        columns.append("prepardness")
+
+    if "total_college_count" in student_fields:
+        columns.append("business_units")
+        columns.append("education_units")
+        columns.append("ethnic_studies_units")
+        columns.append("health_and_social_sci_units")
+        columns.append("interdiciplinary_units")
+        columns.append("liberal_and_creative_units")
+        columns.append("science_and_engineering_units")
+
+    for course in course_list:
+        columns.append(course + "_grade")
+        for field in course_fields:
+            columns.append(course + "_" + field)
+            # columns.append(field+"_sfu")
+            # columns.append(field+"_seq")
+            # columns.append(field+"_prior_ges")
+            # columns.append(field+"_conc_ge")
+
+    for student in students:
+        student_data = []
+        if "CSC" in target and target.split("_")[0] not in student.unique_courses:
+            continue
+        use = True
+        if "status" in student_fields:
+            #if student.status == 'graduated_non_cs':
+            #    student_data.append('graduated_cs')
+            #else:
+            student_data.append(simplify_status(student.status))
+        if "sex" in student_fields:
+            student_data.append(student.sex)
+        if "ethnicity" in student_fields:
+            student_data.append(student.ethnic)
+        if "resident_status" in student_fields:
+            student_data.append(student.resident_status)
+        if "admin_descript" in student_fields:
+            student_data.append(student.admin_descript)
+        if "prep_summary" in student_fields:
+            student_data.append(student.prep_assess_summary)
+
+        if "total_college_count" in student_fields:
+            try:
+                student_data.append(student.units_by_college_totals["Business"])
+            except KeyError:
+                student_data.append(0)
+            try:
+                student_data.append(student.units_by_college_totals["Education"])
+            except KeyError:
+                student_data.append(0)
+            try:
+                student_data.append(student.units_by_college_totals["Ethnic Studies"])
+            except KeyError:
+                student_data.append(0)
+            try:
+                student_data.append(student.units_by_college_totals["Health and Social Sci"])
+            except KeyError:
+                student_data.append(0)
+            try:
+                student_data.append(student.units_by_college_totals["Interdisciplinary Studies"])
+            except KeyError:
+                student_data.append(0)
+            try:
+                student_data.append(student.units_by_college_totals["Liberal and Creative Arts"])
+            except KeyError:
+                student_data.append(0)
+            try:
+                student_data.append(student.units_by_college_totals["Science and Engineering"])
+            except KeyError:
+                student_data.append(0)
+
+        for course in course_list:
+            try:
+                crs = student.unique_courses[course]
+
+                if "CSC" in target and crs.name in target:
+                    #student_data.append(simplify_grade_pf(simplify_grade(crs.grade)))
+                    student_data.append(simplify_grade_int(crs.grade))
                 else:
-                    test_set.append(student)
-    elif "rm_dropouts" in kwargs:
-        for student in students:
-            if "dropout" in student.status:
-                continue
-            check = random.random()
-            if check > .7:
-                test_set.append(student)
-            else:
-                train_set.append(student)
-    elif "sfsu_do_run" in kwargs:
-        for student in students:
-#            if len(student.course_seq_dict) < 2 or student.admin_descript != "1" or student.spring_19_flag == "1":
-            if len(student.course_seq_dict) < 2 or student.admin_descript != "1":
-                continue
-            check = random.random()
-            if check > .7:
-                test_set.append(student)
-            else:
-                train_set.append(student)
+                    student_data.append(crs.grade)
+
+                if "tu" in course_fields:
+                    student_data.append(crs.term_units)
+                if "sfsu_u" in course_fields:
+                    student_data.append(crs.sfsu_units)
+                if "tech_u" in course_fields:
+                    student_data.append(crs.tech_load)
+                if "ge_u" in course_fields:
+                    student_data.append(crs.ge_load)
+                if "seq_int" in course_fields:
+                    student_data.append(crs.seq_int)
+                if "age" in course_fields:
+                    student_data.append(crs.student_age)
+                if "sfsu_gpa" in course_fields:
+                    student_data.append(crs.sfsu_gpa)
+                if "term_gpa" in course_fields:
+                    student_data.append(crs.term_gpa)
+                if "repeat" in course_fields:
+                    student_data.append(crs.repeat)
+                if "crs_bus_units" in course_fields:
+                    try:
+                        student_data.append(crs.course_focus_dict['college']["Business"])
+                    except KeyError:
+                        student_data.append(0)
+                if "crs_edu_units" in course_fields:
+                    try:
+                        student_data.append(crs.course_focus_dict['college']["Education"])
+                    except KeyError:
+                        student_data.append(0)
+                if "crs_ethnic_units" in course_fields:
+                    try:
+                        student_data.append(crs.course_focus_dict['college']["Ethnic Studies"])
+                    except KeyError:
+                        student_data.append(0)
+                if "crs_hss_units" in course_fields:
+                    try:
+                        student_data.append(crs.course_focus_dict['college']["Health and Social Sci"])
+                    except KeyError:
+                        student_data.append(0)
+                if "crs_inter_units" in course_fields:
+                    try:
+                        student_data.append(crs.course_focus_dict['college']["Interdisciplinary Studies"])
+                    except KeyError:
+                        student_data.append(0)
+                if "crs_lca_units" in course_fields:
+                    try:
+                        student_data.append(crs.course_focus_dict['college']["Liberal and Creative Arts"])
+                    except KeyError:
+                        student_data.append(0)
+                if "crs_cose_units" in course_fields:
+                    try:
+                        student_data.append(crs.course_focus_dict['college']["Science and Engineering"])
+                    except KeyError:
+                        student_data.append(0)
+
+            except KeyError:
+                if exclusive:
+                    use = False
+                for x in range(0, len(course_fields) + 1):
+                    student_data.append(-999)
+        if use:
+            all_data.append(student_data)
+    print("****")
+    print(len(all_data))
+    print("****")
+
+    df = pd.DataFrame(np.asarray(all_data), columns=columns)
+
+    return df
+
+def kbase_target(df, target_name, course_fields):
+    localDF = df.copy(deep=True)
+    target = pd.DataFrame(localDF[target_name], columns=[target_name])
+    drop_fields = [target_name]
+
+    if "CSC" in target_name:  #indicates not a graduation prediction
+        crs = target_name.split("_")[0]
+        for field in course_fields:
+            drop_fields.append(crs+"_"+field)
+    localDF = localDF.drop(columns=drop_fields)
+
+    selector = SelectKBest(f_classif)
+    selector.fit(localDF, target)
 
 
-    return train_set, test_set
+    check = list(selector.scores_)
+    pcheck = list(selector.pvalues_)
+    output = [list(localDF.columns)]
+    output.append(check)
+    output.append(pcheck)
 
+    return output
 
-def split_dataset(students): #assumes dataset already split up
-    test_set = []
-    train_set = []
-    type_dict = {}
-    for student in students:
-        check = random.random()
-        if check > .7:
-            test_set.append(student)
-        else:
-            train_set.append(student)
+#tester class
+def classify_tester(df, target_name, course_fields, cv):
+    localDF = df.copy(deep=True)
+    target = pd.DataFrame(localDF[target_name], columns=[target_name])
+    drop_fields = [target_name]
 
+    if "CSC" in target_name:  # indicates not a graduation prediction
+        crs = target_name.split("_")[0]
+        for field in course_fields:
+            drop_fields.append(crs + "_" + field)
+    localDF = localDF.drop(columns=drop_fields)
 
-    return train_set, test_set
+    if "status" in target_name:
+        f1 = 'f1'
+        pres = 'precision'
+        recall = 'recall'
+    else:
+        f1 = 'f1_micro'
+        pres = 'precision_micro'
+        recall = 'recall_micro'
 
+    target = target.to_numpy().astype(np.int).ravel()
+    tester_classifier = GradientBoostingClassifier(n_estimators=300)
+    # tester_preds = cross_val_predict(tester_classifier, preprocessing.scale(localDF), target.to_numpy().ravel(), cv=cv)
+    # scores = cross_val_score(tester_classifier, preprocessing.scale(localDF), target.to_numpy().ravel(), cv=cv)
+    rfecv = RFECV(estimator=tester_classifier, step=1, cv=cv, scoring='accuracy')
+    tester_classifier = GradientBoostingClassifier(n_estimators=300)
+    mod_df = rfecv.fit_transform(preprocessing.scale(localDF), target)
+    tester_preds = cross_val_predict(tester_classifier, mod_df, target, cv=cv)
+    scores = cross_val_score(tester_classifier, mod_df, target, cv=cv)
+    tester_f1 = cross_val_score(tester_classifier, mod_df, target, cv=cv, scoring=f1)
+    tester_precision = cross_val_score(tester_classifier, mod_df, target, cv=cv, scoring=pres)
+    tester_recall = cross_val_score(tester_classifier, mod_df, target, cv=cv, scoring=recall)
+    tester_confuse = confusion_matrix(target, tester_preds)
+    print(scores)
+    print(sum(scores) / len(scores))
+    tester_recall = sum(tester_recall) / len(tester_recall)
+    tester_precision = sum(tester_precision) / len(tester_precision)
+    tester_f1 = sum(tester_f1) / len(tester_f1)
+    tester_avg = sum(scores) / len(scores)
+    tester_feats = rfecv.ranking_
+    #tester_coeff = rfecv.estimator_.coef_[0]
+    print(tester_precision)
+    print(tester_recall)
+    print(tester_f1)
+    print(tester_avg)
+    print(tester_feats)
+    #print(tester_coeff)
 
-def cluster_run(students, n):
-    cluster_data = []
-    student_list = []
-    student_output = []
-    for student in students:
-        cluster_data.append(student.fp_dict['master'])
-        student_list.append(student)
-
-    clusterer = KMeans(n_clusters=n, max_iter=500)
-    #clusterer = AffinityPropagation()
-    #clusterer = MeanShift()
-    pred_clusters = clusterer.fit_predict(cluster_data)
-
-    silhouette_avg = silhouette_score(cluster_data, pred_clusters)
-    # Create a subplot with 1 row and 2 columns
-    fig, (ax1) = plt.subplots(1, 1)
-    fig.set_size_inches(8, 8)
-
-    ax1.set_xlim([-0.1, 1])
-    ax1.set_ylim([0, len(cluster_data) + (n + 1) * 10])
-
-    labels = set()
-    for clust in pred_clusters:
-        labels.add(clust)
-
-    print("For n_clusters =", len(labels),
-          "The average silhouette_score is :", silhouette_avg)
-
-    # Compute the silhouette scores for each sample
-    sample_silhouette_values = silhouette_samples(cluster_data, pred_clusters)
-
-    y_lower = 10
-    for i in range(len(labels)):
-        # Aggregate the silhouette scores for samples belonging to
-        # cluster i, and sort them
-        ith_cluster_silhouette_values = \
-            sample_silhouette_values[pred_clusters == i]
-
-        ith_cluster_silhouette_values.sort()
-
-        size_cluster_i = ith_cluster_silhouette_values.shape[0]
-        y_upper = y_lower + size_cluster_i
-
-        color = cm.nipy_spectral(float(i) / n)
-        ax1.fill_betweenx(np.arange(y_lower, y_upper),
-                          0, ith_cluster_silhouette_values,
-                          facecolor=color, edgecolor=color, alpha=0.7)
-
-        # Label the silhouette plots with their cluster numbers at the middle
-        ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
-
-        # Compute the new y_lower for next plot
-        y_lower = y_upper + 10  # 10 for the 0 samples
-
-    ax1.set_title("The silhouette plot for the various clusters.")
-    ax1.set_xlabel("The silhouette coefficient values")
-    ax1.set_ylabel("Cluster label")
-
-    # The vertical line for average silhouette score of all the values
-    ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
-
-    ax1.set_yticks([])  # Clear the yaxis labels / ticks
-    ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
-
-    plt.suptitle(("Silhouette analysis for KMeans clustering on sample data "
-                  "with n_clusters = %d" % n),
-                 fontsize=14, fontweight='bold')
-
-    #plt.show()
-
-    cluster_dict = {}
-    for x in range(0, len(pred_clusters)):
-        result = pred_clusters[x]
-        student = students[x]
-        student.pred = result
-        student.pred_class = "cluster"
-        utils.add_to_dict_list(result,student, cluster_dict)
-
-    return students, cluster_dict
-
-def cluster_plots(students):
-    cluster_data = []
-    student_list = []
-    student_output = []
-    for student in students:
-        cluster_data.append(student.fp_dict['master'])
-        student_list.append(student)
-
-    print(len(cluster_data))
-    n_set = [2,3,4,5,6,7,8,10,12,14]
-    sil_dict = {}
-
-    for n in n_set:
-        clusterer = KMeans(n_clusters=n)
-        pred_clusters = clusterer.fit_predict(cluster_data)
-
-        silhouette_avg = silhouette_score(cluster_data, pred_clusters)
-        # Create a subplot with 1 row and 2 columns
-        fig, (ax1) = plt.subplots(1, 1)
-        fig.set_size_inches(10, 10)
-
-
-        ax1.set_xlim([-0.1, 1])
-        ax1.set_ylim([0, len(cluster_data) + (n + 1) * 10])
-
-        print("For n_clusters =", n,
-              "The average silhouette_score is :", silhouette_avg)
-
-        # Compute the silhouette scores for each sample
-        sample_silhouette_values = silhouette_samples(cluster_data, pred_clusters)
-
-        y_lower = 10
-        for i in range(n):
-            # Aggregate the silhouette scores for samples belonging to
-            # cluster i, and sort them
-            ith_cluster_silhouette_values = \
-                sample_silhouette_values[pred_clusters == i]
-
-            ith_cluster_silhouette_values.sort()
-
-            size_cluster_i = ith_cluster_silhouette_values.shape[0]
-            y_upper = y_lower + size_cluster_i
-
-            color = cm.nipy_spectral(float(i) / n)
-            ax1.fill_betweenx(np.arange(y_lower, y_upper),
-                              0, ith_cluster_silhouette_values,
-                              facecolor=color, edgecolor=color, alpha=0.7)
-
-            # Label the silhouette plots with their cluster numbers at the middle
-            ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
-
-            # Compute the new y_lower for next plot
-            y_lower = y_upper + 10  # 10 for the 0 samples
-
-        ax1.set_title("The silhouette plot for the various clusters.")
-        ax1.set_xlabel("The silhouette coefficient values")
-        ax1.set_ylabel("Cluster label")
-
-        # The vertical line for average silhouette score of all the values
-        ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
-
-        ax1.set_yticks([])  # Clear the yaxis labels / ticks
-        ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
-
-
-        plt.suptitle(("Silhouette analysis for KMeans clustering on sample data "
-                      "with n_clusters = %d" % n),
-                     fontsize=14, fontweight='bold')
-
-    plt.show()
-
-"""
-def run_student_vectors(core_path, elective_path, request_type, vect_type, base_dir, sim_path):
-    elective_data = utils.list_from_file(elective_path, "\n", ",", False)
-    core_data = utils.list_from_file(core_path, "\n", "," ,False)
-    class_dict = ds.build_class_key_vector(core_data, elective_data, request_type)
-    student_list = utils.get_students_history()
-    student_vects = {}
-    for student in student_list:
-        vect = ds.build_student_vector(student, class_dict, request_type, vect_type)
-        student_vects[student] = vect
-    sim_path = sim_path+request_type+"_"+vect_type+".csv"
-    cluster(student_vects, request_type)
     return
-"""
 
-def precompute_sim(students, vect_type, outpath):
+
+
+#Large tester class, currently set to run battery of four machine learning algorithms
+#df is dataframe, cv is number of crossvalidations
+def classify_target(df, target_name, course_fields, cv):
+    """
+    if clf == "nb":
+        classifier = GaussianNB()
+    elif clf == "svm":
+        classifier = svm.SVC(kernel='poly', C=1.0)
+    elif clf == "rf":
+        classifier = RandomForestClassifier(n_estimators=125)
+    elif clf == "mlp":
+        classifier = MLPClassifier(solver='lbfgs', hidden_layer_sizes=200)
+    else:
+        print("no classifier specified")
+        return
+    """
+    localDF = df.copy(deep=True)
+    target = pd.DataFrame(localDF[target_name], columns=[target_name])
+    drop_fields = [target_name]
+
+    if "CSC" in target_name:  #indicates not a graduation prediction
+        crs = target_name.split("_")[0]
+        for field in course_fields:
+            drop_fields.append(crs+"_"+field)
+    localDF = localDF.drop(columns=drop_fields)
+
+
+    if "status" in target_name:
+        f1= 'f1'
+        pres='precision'
+        recall ='recall'
+    else:
+        f1= 'f1_micro'
+        pres='precision_micro'
+        recall ='recall_micro'
+
+    #currently set to run each classifier twice, once to determine correct factors using RFECV, and then once again
+    #using crossvalidation and the modified dataframe to produce the predictions.
+    target = target.to_numpy().astype(np.int).ravel()
+    lr_classifier = linear_model.LogisticRegression(max_iter=300)
+    #lr_preds = cross_val_predict(lr_classifier, preprocessing.scale(localDF), target.to_numpy().ravel(), cv=cv)
+    #scores = cross_val_score(lr_classifier, preprocessing.scale(localDF), target.to_numpy().ravel(), cv=cv)
+    rfecv = RFECV(estimator=lr_classifier, step=1, cv=cv, scoring='accuracy')
+    lr_classifier = linear_model.LogisticRegression(max_iter=300)
+    mod_df = rfecv.fit_transform(preprocessing.scale(localDF), target)
+    lr_preds = cross_val_predict(lr_classifier, mod_df, target, cv=cv)
+    scores = cross_val_score(lr_classifier, mod_df, target, cv=cv)
+    lr_f1 = cross_val_score(lr_classifier, mod_df, target, cv=cv,  scoring=f1)
+    lr_precision = cross_val_score(lr_classifier, mod_df, target, cv=cv,  scoring=pres)
+    lr_recall = cross_val_score(lr_classifier, mod_df, target, cv=cv,  scoring=recall)
+    lr_confuse = confusion_matrix(target, lr_preds)
+    print(scores)
+    print(sum(scores)/len(scores))
+    lr_recall = sum(lr_recall)/len(lr_recall)
+    lr_precision = sum(lr_precision)/len(lr_precision)
+    lr_f1 = sum(lr_f1)/len(lr_f1)
+    lr_avg = sum(scores)/len(scores)
+    lr_feats = rfecv.ranking_
+    lr_coeff = rfecv.estimator_.coef_[0]
+
+
+    rf_classifier = RandomForestClassifier(n_estimators=300)
+    #rf_preds = cross_val_predict(rf_classifier, preprocessing.scale(localDF), target, cv=cv)
+    #scores = cross_val_score(rf_classifier, preprocessing.scale(localDF), target, cv=cv)
+    rfecv = RFECV(estimator=rf_classifier, step=1, cv=cv, scoring='accuracy')
+    mod_df = rfecv.fit_transform(preprocessing.scale(localDF), target)
+    rf_classifier = RandomForestClassifier(n_estimators=300)
+    rf_preds = cross_val_predict(rf_classifier, mod_df, target, cv=cv)
+    scores = cross_val_score(rf_classifier, mod_df, target, cv=cv)
+    rf_f1 = cross_val_score(rf_classifier, mod_df, target, cv=cv,  scoring=f1)
+    rf_precision = cross_val_score(rf_classifier, mod_df, target, cv=cv,  scoring=pres)
+    rf_recall = cross_val_score(rf_classifier, mod_df, target, cv=cv,  scoring=recall)
+    rf_confuse = confusion_matrix(target, rf_preds)
+    print(scores)
+    print(sum(scores) / len(scores))
+    rf_recall = sum(rf_recall) / len(rf_recall)
+    rf_precision = sum(rf_precision) / len(rf_precision)
+    rf_f1 = sum(rf_f1) / len(rf_f1)
+    rf_avg = sum(scores)/len(scores)
+    rf_feats = rfecv.ranking_
+    rf_coeff = rfecv.estimator_.feature_importances_
+
+
+    svm_classifier = svm.SVC(kernel='linear', C=1.5)
+    #svm_preds = cross_val_predict(svm_classifier, preprocessing.scale(localDF), target, cv=cv)
+    #scores = cross_val_score(svm_classifier, preprocessing.scale(localDF), target, cv=cv)
+    rfecv = RFECV(estimator=svm_classifier, step=1, cv=cv, scoring='accuracy')
+    mod_df = rfecv.fit_transform(preprocessing.scale(localDF), target)
+    svm_classifier = svm.SVC(kernel='linear', C=1.5)
+    svm_preds = cross_val_predict(svm_classifier, mod_df, target, cv=cv)
+    scores = cross_val_score(svm_classifier, mod_df, target, cv=cv)
+    svm_f1 = cross_val_score(svm_classifier, mod_df, target, cv=cv,  scoring=f1)
+    svm_precision = cross_val_score(svm_classifier, mod_df, target, cv=cv,  scoring=pres)
+    svm_recall = cross_val_score(svm_classifier, mod_df, target, cv=cv,  scoring=recall)
+    svm_confuse = confusion_matrix(target, svm_preds)
+    print(scores)
+    print(sum(scores) / len(scores))
+    svm_recall = sum(svm_recall) / len(svm_recall)
+    svm_precision = sum(svm_precision) / len(svm_precision)
+    svm_f1 = sum(svm_f1) / len(svm_f1)
+    svm_avg = sum(scores)/len(scores)
+    svm_feats = rfecv.ranking_
+    svm_coeff = rfecv.estimator_.coef_[0]
+
+
+    #classifier = MLPClassifier(solver='lbfgs', hidden_layer_sizes=200, max_iter=1000)
+    pc_classifier = linear_model.Perceptron(max_iter=1200)
+    #mlp_predtemp = cross_val_predict(mlp_classifier, preprocessing.scale(localDF), target, cv=cv)
+    #scores = cross_val_score(mlp_classifier, preprocessing.scale(localDF), target, cv=cv)
+    rfecv = RFECV(estimator=pc_classifier, step=1, cv=cv, scoring='accuracy')
+    pc_classifier = linear_model.Perceptron(max_iter=1200)
+    mod_df = rfecv.fit_transform(preprocessing.scale(localDF), target)
+    mlp_predtemp = cross_val_predict(pc_classifier, mod_df, target, cv=cv)
+    scores = cross_val_score(pc_classifier, mod_df, target, cv=cv)
+    mlp_f1 = cross_val_score(pc_classifier, mod_df, target, cv=cv,  scoring=f1)
+    mlp_precision = cross_val_score(pc_classifier, mod_df, target, cv=cv,  scoring=pres)
+    mlp_recall = cross_val_score(pc_classifier, mod_df, target, cv=cv,  scoring=recall)
+    mlp_preds = [] #fix odd bug
+    for x in mlp_predtemp:
+        mlp_preds.append(int(x))
+    mlp_confuse = confusion_matrix(target, mlp_preds)
+    print(scores)
+    print(sum(scores) / len(scores))
+    mlp_recall = sum(mlp_recall) / len(mlp_recall)
+    mlp_precision = sum(mlp_precision) / len(mlp_precision)
+    mlp_f1 = sum(mlp_f1) / len(mlp_f1)
+    mlp_avg = sum(scores)/len(scores)
+    mlp_feats = rfecv.ranking_
+    mlp_coeff = rfecv.estimator_.coef_[0]
+
+    #rest of coude is just output processing
+    lr_feat_output = process_feat_output(lr_feats, lr_coeff, localDF, "lr")
+    rf_feat_output = process_feat_output(rf_feats, rf_coeff, localDF, "rf")
+    svm_feat_output = process_feat_output(svm_feats, svm_coeff, localDF, "svm")
+    mlp_feat_output = process_feat_output(mlp_feats, mlp_coeff, localDF, "mlp")
+    print(lr_feats)
+    print(lr_coeff)
+    print(rf_feats)
+    print(rf_coeff)
+    print(svm_feats)
+    print(svm_coeff)
+    print(mlp_feats)
+    print(mlp_coeff)
+
+
+    #Edited out to match output for pass fail preds only.
+    if "grade" in target_name:
+        output = [[target_name+"_true_value", target_name+"_pf_true",
+                   "svm_pred", "svm_check", "svm_pf_pred", "svm_pf_check",
+                   "rf_pred", "rf_check", "rf_pf_pred", "rf_pf_check",
+                   "mlp_pred", "mlp_check", "mlp_pf_pred", "mlp_pf_check",
+                   "lr_pred", "lr_check", "lr_pf_pred", "lr_pf_check"]]
+    #if "grade" in target_name:
+    #    output = [[target_name+"_true_value", "svm_pred", "svm_check", "rf_pred", "rf_check", "mlp_pred", "mlp_check",
+    #               "lr_pred", "lr_check"]]
+    else:
+        output = [[target_name+"_true_value", "svm_pred", "svm_check", "rf_pred", "rf_check", "mlp_pred", "mlp_check",
+                   "lr_pred", "lr_check"]]
+
+    answers = target
+
+    ans_pf = [0] * len(answers)
+    svm_pf_preds = [0] * len(svm_preds)
+    rf_pf_preds = [0] * len(rf_preds)
+    lr_pf_preds = [0] * len(lr_preds)
+    mlp_pf_preds = [0] * len(mlp_preds)
+
+    simp_answers = [0] * len(answers)
+    simp_svm_preds = [0] * len(answers)
+    simp_rf_preds = [0] * len(answers)
+    simp_lr_preds = [0] * len(answers)
+    simp_mlp_preds = [0] * len(answers)
+
+
+    for x in range(0, len(answers)):
+        svm_pf_check = '0'
+        rf_pf_check = '0'
+        lr_pf_check = '0'
+        mlp_pf_check = '0'
+        svm_check = '0'
+        rf_check = '0'
+        lr_check = '0'
+        mlp_check = '0'
+
+        if "grade" in target_name:
+            simp_answers[x] = simplify_grade(answers[x])
+            simp_svm_preds[x] = simplify_grade(svm_preds[x])
+            simp_rf_preds[x] = simplify_grade(rf_preds[x])
+            simp_lr_preds[x] = simplify_grade(lr_preds[x])
+            simp_mlp_preds[x] = simplify_grade(mlp_preds[x])
+
+            ans_pf[x] = simplify_grade_pf(simp_answers[x])
+            svm_pf_preds[x] = simplify_grade_pf(simp_svm_preds[x])
+            rf_pf_preds[x] = simplify_grade_pf(simp_rf_preds[x])
+            lr_pf_preds[x] = simplify_grade_pf(simp_lr_preds[x])
+            mlp_pf_preds[x] = simplify_grade_pf(simp_mlp_preds[x])
+
+
+        if simp_svm_preds[x] == simp_answers[x]:
+            svm_check = '1'
+        if simp_rf_preds[x] == simp_answers[x]:
+            rf_check = '1'
+        if simp_lr_preds[x] == simp_answers[x]:
+            lr_check = '1'
+        if simp_mlp_preds[x] == simp_answers[x]:
+            mlp_check = '1'
+
+
+        if svm_pf_preds[x] == ans_pf[x]:
+            svm_pf_check = '1'
+        if rf_pf_preds[x] == ans_pf[x]:
+            rf_pf_check = '1'
+        if lr_pf_preds[x] == ans_pf[x]:
+            lr_pf_check = '1'
+        if mlp_pf_preds[x] == ans_pf[x]:
+            mlp_pf_check = '1'
+
+
+
+        #print(answers[x]+','+ans_pf[x]+str(svm_preds[x])+","+svm_check+","+str(rf_preds[x])+","+rf_check+","+str(mlp_preds[x])
+        #      +","+mlp_check+","+str(lr_preds[x])+","+lr_check)
+        #print(target)
+        #Code below commented out due to reducing operation to binary yes/no. It is still functional under these
+        #conditions, but produces junk output so no need to create possiblity for confusion.
+        if "grade" in target_name:
+            output.append([answers[x], ans_pf[x],
+                           str(svm_preds[x]), svm_check, svm_pf_preds[x], svm_pf_check,
+                           str(rf_preds[x]), rf_check, rf_pf_preds[x], rf_pf_check,
+                           str(mlp_preds[x]),mlp_check, mlp_pf_preds[x], mlp_pf_check,
+                           str(lr_preds[x]), lr_check, lr_pf_preds[x], lr_pf_check])
+        #if "grade" in target_name:
+        #    output.append([answers[x], str(svm_preds[x]), svm_check, str(rf_preds[x]), rf_check, str(mlp_preds[x]),
+        #                   mlp_check, str(lr_preds[x]), lr_check])
+        else:
+            output.append([answers[x], str(svm_preds[x]), svm_check, str(rf_preds[x]), rf_check, str(mlp_preds[x]),
+                           mlp_check, str(lr_preds[x]), lr_check])
+
+
+    spacer = [" "]
+    output[4].extend(spacer)
+    output[5].extend(spacer)
+    output[6].extend(spacer)
+    output[7].extend(spacer)
+
+    output[4].extend(["lr avg", lr_avg])
+    output[5].extend(["rf avg", rf_avg])
+    output[6].extend(["svm avg", svm_avg])
+    output[7].extend(["mlp avg", mlp_avg])
+
+    #rf_output = rf_feature_importance(localDF, target, target_name)
+    feat_output = write_feat_output([lr_feat_output, rf_feat_output, svm_feat_output])
+    feat_output.append([""])
+    feat_output.append(localDF.columns)
+    feat_output.append(["****"])
+    feat_output.append(["lr"])
+    feat_output.append([lr_avg])
+    feat_output.append(lr_feats)
+    feat_output.append(lr_coeff)
+    feat_output.append(["lr precision", "lr_recall", "lr_f1"])
+    feat_output.append([lr_precision, lr_recall, lr_f1])
+    feat_output.append([""])
+    feat_output.append(["lr", "Predicted_false", "Predictied_true"])
+    feat_output.append(["true_false", lr_confuse[0][0], lr_confuse[0][1]])
+    feat_output.append(["true_positive", lr_confuse[1][0], lr_confuse[1][1]])
+    feat_output.append(["****"])
+    feat_output.append(["rf"])
+    feat_output.append([rf_avg])
+    feat_output.append(rf_feats)
+    feat_output.append(rf_coeff)
+    feat_output.append(["rf precision", "rf_recall", "rf_f1"])
+    feat_output.append([rf_precision, rf_recall, rf_f1])
+    feat_output.append([""])
+    feat_output.append(["rf","Predicted_false", "Predictied_true"])
+    feat_output.append(["true_false", rf_confuse[0][0], rf_confuse[0][1]])
+    feat_output.append(["true_positive", rf_confuse[1][0], rf_confuse[1][1]])
+    feat_output.append(["****"])
+    feat_output.append(["svm"])
+    feat_output.append([svm_avg])
+    feat_output.append(svm_feats)
+    feat_output.append(svm_coeff)
+    feat_output.append(["svm precision", "svm_recall", "svm_f1"])
+    feat_output.append([svm_precision, svm_recall, svm_f1])
+    feat_output.append([""])
+    feat_output.append(["svm","Predicted_false", "Predictied_true"])
+    feat_output.append(["true_false", svm_confuse[0][0], svm_confuse[0][1]])
+    feat_output.append(["true_positive", svm_confuse[1][0], svm_confuse[1][1]])
+    feat_output.append(["****"])
+    feat_output.append(["mlp"])
+    feat_output.append([mlp_avg])
+    feat_output.append(mlp_feats)
+    feat_output.append(mlp_coeff)
+    feat_output.append(["mlp precision", "mlp_recall", "mlp_f1"])
+    feat_output.append([mlp_precision, mlp_recall, mlp_f1])
+    feat_output.append([""])
+    feat_output.append(["mlp", "Predicted_false", "Predictied_true"])
+    feat_output.append(["true_false", mlp_confuse[0][0], mlp_confuse[0][1]])
+    feat_output.append(["true_positive", mlp_confuse[1][0], mlp_confuse[1][1]])
+
+    return output, feat_output
+
+#unused code for feature importance using Random forest
+def rf_feature_importance(localDF, target, target_name):
+    output = [["variable", "importance"]]
+    lr_classifier = linear_model.LogisticRegression(max_iter=300)
+    rf_classifier = RandomForestClassifier(n_estimators=400)
+    svm_classifier = svm.SVC(kernel='linear', C=1.5)
+
+    lr_classifier.fit(localDF, target[target_name])
+    rf_classifier.fit(localDF, target[target_name])
+    svm_classifier.fit(localDF, target[target_name])
+    for x in range(0, len(localDF.columns)):
+        #print(localDF.columns[x] + "," + str(classifier.feature_importances_[x]))
+        output.append([localDF.columns[x], str(rf_classifier.feature_importances_[x])])
+    return output
+
+#returns header from processed dataframe for output
+def process_feat_output(feats, coefs, df, name):
+    output_header = [[name+"_feat", name+"_weight"]]
+    i = 0
     output = []
-    for x in range(0, len(students)):
-        student_a = students[x]
-        print(x)
-        for y in range(x+1, len(students)):
-            student_b = students[y]
-            dissim = 1 - cosine_similarity(student_a.fp_dict["vect_type"], student_b.fp_dict["vect_type"])
-            output.append(str(student_a.id_num)+","+str(student_b.id_num)+","+str(dissim))
-    utils.list_to_file(outpath, output)
+    for x in range(0, len(feats)):
+        if feats[x] == 1:
+            output.append([df.columns[x], abs(coefs[i])])
+            i+=1
+    output.sort(reverse=True, key=lambda x: x[1])
+    output_header.extend(output)
+    return output_header
 
-def classifiy_dropout(training_set, testing_set, vect):
-    tp = 0
-    tn = 0
-    fp = 0
-    fn = 0
+#takes output from predictions and processes it to CSV file
+def write_feat_output(lists):
+    max_len = 0
+    master_counter = {}
+    for y in lists:
+        if len(y) > max_len:
+            max_len = len(y)
 
-    X = []
-    y = []
-    for student in training_set:
-        X.append(student.fp_dict[vect])
-        if "dropout" not in student.status:
-            y.append("Pass")
-        else:
-            y.append("Failout")
+    master_output =[[lists[0][0][0], lists[0][0][1], "", lists[1][0][0], lists[1][0][1], "", lists[2][0][0], lists[2][0][1]]]
 
-    #clf = svm.SVC(kernel='rbf', C=1.0)
-    #clf = ComplementNB()
-    #clf = ExtraTreesClassifier(n_estimators=300)
-    #clf = AdaBoostClassifier(n_estimators=400)
-    clf = RandomForestClassifier(n_estimators=400)
-    clf.fit(X, y)
+    for x in range(1, max_len):
+        output = []
+        z = 0
+        for y in range(0, len(lists)):
+            temp_list = lists[y]
+            try:
+                output.append(temp_list[x][0])
+                output.append(abs(temp_list[x][1]))
+                utils.sum_to_dict(temp_list[x][0], 1, master_counter)
+            except IndexError:
+                output.append("")
+                output.append("")
+            z+=1
+            output.append("")
+        master_output.append(output)
 
-    pred_dict = {}
-    for student in testing_set:
-        pred = clf.predict([student.fp_dict[vect]])
+    counter_output = []
+    for key in master_counter:
+        counter_output.append(str(key)+","+str(master_counter[key]))
+        counter_output.sort(reverse=True, key=lambda x: x[1])
+    master_output.append("")
+    for x in counter_output:
+        master_output.append([x])
 
-        #print("********")
-        #print(pred[0])
-        #print(student.status)
-        student.pred = pred[0]
-        if pred[0] == "Pass" and "dropout" not in student.status:
-            tp += 1
-            #print("tp")
-            student.pred_class = "tp"
-        elif pred[0] == 'Pass' and "dropout" in student.status:
-            fp += 1
-            #print("fp")
-            student.pred_class ="fp"
-
-        elif pred[0] == 'Failout' and "dropout" not in student.status:
-            fn += 1
-            #print("fn")
-            student.pred_class ="fn"
-
-        else:
-            tn += 1
-            #print("tn")
-            student.pred_class = "tn"
+    return master_output
 
 
-        #print("*********")
-
-    print(str(len(testing_set)) +" total prediction")
-    print (str(tp) + " true positive")
-    print (str(fn) + " true neg")
-    print (str(fp) + " false positive")
-    print (str(fn) + " false neg")
-    print("___")
-    return testing_set
-
-def pred_student_grade_spanish(training_set, testing_set, pred_class, pred_class_seq, vect): #TODO build stats for success, train in bulk using year 1, year 2 etc
-    X = []
-    y = []
-
-    for student in training_set:
-        ref_course_list = []
-        for x in range(1,pred_class_seq):
-            ref_course_list.extend(student.course_seq_dict[x])
-        if pred_class not in student.unique_courses: #skips if that student has not taken class for predicition
-            continue
-        X.append(student.fp_dict[vect])
-        y.append(int(student.unique_courses[pred_class].grade))
-
-    clf = svm.SVC(kernel='rbf', C=1.0)
-
-    clf.fit(X, y)
-    acc_avg = 0
-    total = 0
-    for student in testing_set:
-
-        pred = clf.predict([student.fp_dict[vect]])
-        try:
-            real_grade = student.unique_courses[pred_class].grade
-        except KeyError:
-            continue
-        diff = abs(pred - real_grade)[0]
-        if real_grade == 0:
-            pct_off = 1
-        else:
-            pct_off = diff/real_grade
-            if pct_off > .3:
-                print("-----")
-                print(student.id_num)
-                print(real_grade)
-                print(pred)
-                print("-----")
-            acc_avg += pct_off
-            total += 1
-        print(pct_off)
-    print(acc_avg/total)
-
-def assess_possible_classes_sfsu(student, sfsu_core_classes): #return a list of courses possible to take
-
-    taken = student.passed_classes
-    possible = []
-    for course in sfsu_core_classes:
-        if course.name in taken:
-            continue #skip course taken
-        eligible = student.check_prereqs(course.prereqs)
-        if eligible:
-            possible.append(course)
-    return possible
-
-
-
-def pred_student_grade_sfsu(): #So lets things about this. IRL, the student wouldnt not have all the neceessary classes
-    return                      #but where we can still do same thing as spanish and set a cutoff for the semesters, then make predictions for the next
-                                #set of possible classes.
-
-
-def cluster_old(student_vects, request_type, vect_type, base_dir, dissim_path):
-    cluster_data = []
-    student_list = []
-    student_output = []
-    for student in student_vects:
-        cluster_data.append(student_vects[student])
-        student_output.append(str(student.id_num) + "," + str(student.grade_adj) + "," + str(student.age))
-        student_list.append(student)
-
-    # ms = MeanShift().fit_predict(cluster_data)
-    # ward = AgglomerativeClustering(n_clusters=5, linkage='ward').fit_predict(cluster_data)
-    # utils.list_to_file(base_dir+"/test_labels_"+request_type+"_"+vect_type, student_output)
-    # utils.list_to_file("test_clusters_ms", ms)
-    n_set = [5]
-    # dissim_list = utils.list_from_file(dissim_path,"\n", ",", False)
-    # dissim_dict = ca.format_dissim_list(dissim_list)
-
-    for n in n_set:
-        pred_clusters = KMeans(n_clusters=n).fit(cluster_data)
-        analysis_set = ca.cluster_analysis(cluster_data, pred_clusters.labels_, student_list, dissim_dict)
-        os.mkdir(base_dir + "/" + str(n) + "_run")
-        for clust in analysis_set:
-            ca.print_stats(analysis_set[clust], clust, base_dir + "/" + str(n) + "_run")
-            utils.list_to_file("test_clusters_kmeans_" + str(n) + "_" + request_type + "_" + vect_type,
-                               pred_clusters.labels_)
-
-    # utils.list_to_file("test_labels_2_2"+vect_type+"_"+request_type+".csv", student_output)
-
-    # af = AffinityPropagation().fit(cluster_data)
-    # cluster_centers_indices = af.cluster_centers_indices_
-    # labels = af.labels_
-
-    # n_clusters_ = len(cluster_centers_indices)
-
-    # print('Estimated number of clusters: %d' % n_clusters_)
-    # print("Homogeneity: %0.3f" % metrics.homogeneity_score(labels_true, labels))
-    # print("Completeness: %0.3f" % metrics.completeness_score(labels_true, labels))
-    # print("V-measure: %0.3f" % metrics.v_measure_score(labels_true, labels))
-    # print("Adjusted Rand Index: %0.3f"
-    #      % metrics.adjusted_rand_score(labels_true, labels))
-    # print("Adjusted Mutual Information: %0.3f"
-    #      % metrics.adjusted_mutual_info_score(labels_true, labels))
-    print("Silhouette Coefficient: %0.3f"
-          % metrics.silhouette_score(cluster_data, labels, metric='sqeuclidean'))
-    utils.list_to_file("test_clusters_af_" + vect_type + "_" + request_type, af.labels_)
-    print("DB Index: %0.3f"
-          % metrics.davies_bouldin_score(cluster_data, af.labels_))
-
-    print("km 10")
-    pred_clusters = KMeans(n_clusters=10).fit(cluster_data)
-    utils.list_to_file("test_clusters_kmeans_10_" + vect_type + "_" + request_type, pred_clusters.labels_)
-    print("Silhouette Coefficient: %0.3f"
-          % metrics.silhouette_score(cluster_data, pred_clusters.labels_, metric='sqeuclidean'))
-    print("DB Index: %0.3f"
-          % metrics.davies_bouldin_score(cluster_data, pred_clusters.labels_))
-
-
-def predict_course(classifier, query_student, query_seq, query_tu, prep_courses, **kwargs):
-    prep_courses.sort()
-    any_prior_course = query_student.course_seq_dict[query_seq-1][0]
-    query_student_data = [query_seq,query_tu, any_prior_course.sfsu_units, any_prior_course.sfsu_gpa]
-    for prep_course in prep_courses:
-        query_student_data.append(query_student.unique_courses[prep_course].grade)
-        query_student_data.append(query_student.unique_courses[prep_course].term_units)
-        if "prior_ge" in kwargs:
-            ge_count =0
-            for course in query_student.course_history:
-                if course.type == "ge" and course.seq_int < query_seq:
-                    ge_count+=1
-            query_student_data.append(ge_count)
-        if "concurrent_ge" in kwargs:
-            cge_count = 0
-            course_list = query_student.course_seq_dict[query_seq]
-            for course in course_list:
-                if course.type == "ge":
-                    cge_count += 1
-            query_student_data.append(cge_count)
-    pred_grade = classifier.predict(query_student_data)
-    return pred_grade
-
-def cluster_named(X, Y, n):
-    cluster_dict = {}
-    clusterer = KMeans(n_clusters=n, max_iter=500)
-    # clusterer = AffinityPropagation()
-    # clusterer = MeanShift()
-    pred_clusters = clusterer.fit_predict(X)
-
-    for x in range(0, len(pred_clusters)):
-        result = pred_clusters[x]
-        student = Y[x]
-        student.pred = result
-        student.pred_class = "cluster"
-        utils.add_to_dict_list(result, student, cluster_dict)
-
-    return cluster_dict
