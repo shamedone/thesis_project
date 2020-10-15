@@ -158,15 +158,17 @@ def update_top_100(value, top_100):
             top_100 = sorted(top_100, key=itemgetter(0), reverse=True)
     return top_100
 
-#scores sequneces based on score map.
+#scores sequneces based on score map. Returns top 100 scoring sequences, has options to force add CSC211 and CSC412/
+#also includes options to only do transfer, combo, or freshman.
 def score_series_set(path, outpath, add_412, add_211, class_type):
 
+    #score maps are built from sequence analysis and I have included examples of their format in git.
     if class_type.lower() == "transfer":
         seq_score_map = utils.dict_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/subset_transfer_sequence_score_map_25.csv",
                                             0,1,"\n", ",", True)
         equiv_score_map = utils.dict_from_file("/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/subset_transfer_concurrent_score_map_25.csv",
                                             0,1,"\n", ",", True)
-    elif class_type.lower() == "all":
+    elif class_type.lower() == "49_set":#This was some testing work I did
         seq_score_map = utils.dict_from_file(
             "/Users/thomasolson/Documents/workspace/advising_revamp/group analysis runs/49_cs_sequence_score_map_25.csv",
             0, 1, "\n", ",", True)
